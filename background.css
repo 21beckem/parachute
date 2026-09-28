@@ -1,0 +1,307 @@
+/* Background artwork only: sky, clouds, landscape, and desk decorations.
+ * Cloud speed and spacing are controlled by the variables on each cloud.
+ * Negative delays start the clouds at different points across the sky.
+ */
+
+/* Sky and moving clouds */
+.scenery {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: -1;
+    background: linear-gradient(#478ff0 0%, #8dd3f8 63%, #d2eebc 85%);
+    pointer-events: none;
+}
+
+.cloud {
+    position: absolute;
+    width: 220px;
+    height: 48px;
+    background: #ffffffde;
+    border-radius: 100px;
+    filter: drop-shadow(0 9px 6px #c3e4f577);
+    left: -300px;
+    animation: cloud-drift var(--cloud-duration, 100s) linear infinite;
+    animation-delay: var(--cloud-delay, 0s);
+}
+
+.cloud::before,
+.cloud::after {
+    content: '';
+    position: absolute;
+    background: inherit;
+    border-radius: 50%;
+}
+
+.cloud::before {
+    width: 95px;
+    height: 85px;
+    left: 36px;
+    bottom: 8px;
+}
+
+.cloud::after {
+    width: 75px;
+    height: 64px;
+    right: 24px;
+    bottom: 7px;
+}
+
+.cloud-one {
+    top: 14%;
+    transform: rotate(8deg) scale(0.8);
+    opacity: 0.86;
+    --cloud-duration: 110s;
+    --cloud-delay: -40s;
+    --cloud-still-left: 32%;
+}
+
+.cloud-two {
+    top: 31%;
+    transform: scale(1.1);
+    --cloud-duration: 130s;
+    --cloud-delay: -12s;
+    --cloud-still-left: -6%;
+}
+
+.cloud-three {
+    top: 25%;
+    transform: scale(1.25);
+    --cloud-duration: 100s;
+    --cloud-delay: -80s;
+    --cloud-still-left: 86%;
+}
+
+.cloud-four {
+    top: 51%;
+    transform: scale(0.72);
+    opacity: 0.85;
+    --cloud-duration: 145s;
+    --cloud-delay: -80s;
+    --cloud-still-left: 51%;
+}
+
+.cloud-five {
+    top: 58%;
+    transform: scale(0.65);
+    opacity: 0.85;
+    --cloud-duration: 120s;
+    --cloud-delay: -30s;
+    --cloud-still-left: 14%;
+}
+
+/* Distant mountains, hills, and flowers */
+.mountains {
+    position: absolute;
+    bottom: 19%;
+    right: -5%;
+    width: 65%;
+    height: 24%;
+    background: #6c9dc6;
+    clip-path: polygon(0 95%, 12% 65%, 20% 76%, 39% 28%, 48% 43%, 57% 35%, 71% 65%, 85% 18%, 100% 55%, 100% 100%);
+}
+
+.hill {
+    position: absolute;
+    width: 120%;
+    height: 38%;
+    bottom: 0;
+    border-radius: 50% 60% 0 0;
+}
+
+.hill-back {
+    background: linear-gradient(172deg, #beda67 4%, #7fad47 45%, #527f3e);
+    left: -35%;
+    bottom: 7%;
+    transform: rotate(6deg);
+    box-shadow: inset 0 8px 0 #d4e98099;
+}
+
+.hill-front {
+    right: -49%;
+    bottom: -3%;
+    height: 36%;
+    transform: rotate(-9deg);
+    background: linear-gradient(165deg, #b6d664, #6e9d43 50%);
+}
+
+.wildflowers {
+    position: absolute;
+    inset: 73% 0 10%;
+    transform: rotate(-3deg);
+    opacity: 0.7;
+    background-image: radial-gradient(ellipse, #ffec9a 0 2px, transparent 3px), radial-gradient(ellipse, #ffffed 0 2px, transparent 3px);
+    background-size: 79px 37px, 113px 51px;
+    background-position: 8px 0, 31px 20px;
+}
+
+/* Desk, mug, and books */
+.desk {
+    position: absolute;
+    z-index: -1;
+    inset: 57px 0 0;
+    background: repeating-linear-gradient(3deg, transparent 0 25px, #92533015 26px 30px, transparent 31px 44px), linear-gradient(#f6d69e 0 57%, #b7774b 58%);
+    border-top: 5px solid #826044;
+    border-bottom: 8px solid #8e593c;
+    border-radius: 50% 50% 0 0 / 30% 30% 0 0;
+    box-shadow: 0 -8px 0 #eac787;
+}
+
+.mug {
+    position: absolute;
+    left: 10%;
+    bottom: 37px;
+    width: 78px;
+    height: 93px;
+    background: #fff1d4;
+    border: 3px solid #7c6046;
+    border-radius: 6px 6px 24px 24px;
+    box-shadow: inset -7px 0 #e7d3af;
+    transform: rotate(-3deg);
+}
+
+.mug::before {
+    content: '';
+    position: absolute;
+    left: -25px;
+    top: 16px;
+    width: 25px;
+    height: 46px;
+    border: 7px solid #f7e5c3;
+    outline: 3px solid #7c6046;
+    border-radius: 40% 0 0 45%;
+    z-index: -1;
+}
+
+.mug::after {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: -8px;
+    width: 78px;
+    height: 17px;
+    border: 3px solid #7c6046;
+    border-radius: 50%;
+    background: #bda27d;
+    box-shadow: inset 0 3px #f9e8c5;
+}
+
+.mug span {
+    display: block;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1.15;
+    padding-top: 17px;
+    color: #6d5842;
+}
+
+.mug i {
+    display: block;
+    color: #c76f59;
+    font-style: normal;
+}
+
+.books {
+    position: absolute;
+    right: 6%;
+    bottom: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    transform: rotate(4deg);
+}
+
+.books span {
+    padding: 7px 22px;
+    border: 3px solid #69533e;
+    border-radius: 7px 3px 3px 7px;
+    background: #739cc1;
+    font-size: 12px;
+    letter-spacing: 1px;
+    font-weight: bold;
+    color: #fff0d7;
+    box-shadow: inset 6px 0 #ffffff26;
+}
+
+.books span:nth-child(2) {
+    background: #c58c59;
+    margin-right: 7px;
+}
+
+.books span:nth-child(3) {
+    background: #f2deb0;
+    color: #796145;
+    margin-right: 0;
+}
+
+/* Responsive scenery */
+@media (max-width: 900px) {
+    .mug {
+        left: 5%;
+    }
+
+    .books {
+        right: 3%;
+        transform: rotate(4deg) scale(0.8);
+        transform-origin: right bottom;
+    }
+}
+
+@media (max-width: 640px) {
+    .cloud-three {
+        top: 37%;
+    }
+
+    .cloud-four {
+        top: 55%;
+    }
+
+    .hill-back {
+        width: 160%;
+        bottom: 10%;
+        height: 25%;
+    }
+
+    .hill-front {
+        height: 25%;
+        width: 150%;
+    }
+
+    .wildflowers {
+        top: 74%;
+    }
+
+    .mug,
+    .books {
+        display: none;
+    }
+
+    .desk {
+        top: 53px;
+    }
+
+    .cloud {
+        opacity: 0.65;
+    }
+}
+
+/* Start and reset outside the screen so the loop stays hidden */
+@keyframes cloud-drift {
+    from {
+        translate: 0 0;
+    }
+
+    to {
+        translate: calc(100vw + 600px) 0;
+    }
+}
+
+/* Keep clouds visible and still when reduced motion is requested */
+@media (prefers-reduced-motion: reduce) {
+    .cloud {
+        animation: none;
+        translate: none;
+        left: var(--cloud-still-left);
+    }
+}

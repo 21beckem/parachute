@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="theme-color" content="#549ff0">
+        <meta
+            name="description"
+            content="Parachute — a playful concept for sending files and folders straight to a friend."
+        >
+        <title>Parachute — Drop files. Spread joy.</title>
+        <link rel="stylesheet" href="background.css">
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <!-- Reusable illustrations; all artwork and motion are HTML/CSS only. -->
+        <svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+                <symbol id="parachute" viewBox="0 0 200 190">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 88 87 158M53 86l38 72M100 81v77M147 86l-38 72M183 88l-70 70" fill="none" />
+                        <path
+                            d="M15 87C15-12 185-12 185 87Q169 70 147 85Q124 69 100 82Q76 69 53 85Q32 71 15 87Z"
+                            fill="#f47869"
+                            stroke="#793e45"
+                        />
+                        <path
+                            d="M53 85C52 44 69 11 100 7C79 28 76 52 76 76M100 7c33 4 48 39 47 78q-22-16-47-3c0-31 1-51 0-75Z"
+                            fill="#fff9ed"
+                            stroke="#793e45"
+                        />
+                        <path
+                            d="M15 87q17 24 38 18q22 18 47 5q27 12 47-5q23 5 38-18q-17-17-38-2q-24-16-47-3Q76 69 53 85Q32 71 15 87Z"
+                            fill="#b95259"
+                            fill-opacity=".65"
+                            stroke="#793e45"
+                        />
+                        <path d="m53 85 38 73m56-73-38 73M100 82v76" fill="none" />
+                    </g>
+                </symbol>
+            </defs>
+        </svg>
+
+        <!-- Background layers; styled in background.css. -->
+        <div class="scenery" aria-hidden="true">
+            <div class="cloud cloud-one"></div>
+            <div class="cloud cloud-two"></div>
+            <div class="cloud cloud-three"></div>
+            <div class="cloud cloud-four"></div>
+            <div class="cloud cloud-five"></div>
+            <div class="mountains"></div>
+            <div class="hill hill-back"></div>
+            <div class="hill hill-front"></div>
+            <div class="wildflowers"></div>
+        </div>
+
+        <!-- Branding and preview status. -->
+        <header class="site-header">
+            <a class="wordmark" href="index.html" aria-label="Parachute home">
+                <svg class="brand-icon" viewBox="0 0 200 190" aria-hidden="true">
+                    <use href="#parachute" />
+                    <path
+                        d="M72 171c-25 2-28-27-8-33c1-22 33-27 43-8c24-12 43 19 24 32c-7 20-31 17-38 8c-6 7-15 8-21 1Z"
+                        fill="#fffdf5"
+                        stroke="#293d52"
+                        stroke-width="6"
+                    />
+                </svg>
+                <span>
+                    <span class="brand-name">Parachute</span>
+                    <span class="tagline">Drop files. Spread joy.</span>
+                </span>
+            </a>
+            <div class="header-tools">
+                <span class="status">
+                    <span class="status-dot"></span>
+                    Preview mode
+                </span>
+            </div>
+        </header>
+
+        <main>
+            <section class="airspace" aria-labelledby="scene-title">
+                <h1 id="scene-title" class="visually-hidden">
+                    A little drop. A soft landing.
+                </h1>
+                <!-- Reserved for future incoming peer-to-peer deliveries. -->
+            </section>
+
+            <!-- File picker and the decorative packing desk. -->
+            <section class="packing-station" aria-labelledby="packing-title">
+                <div class="desk" aria-hidden="true"></div>
+                <div class="mug" aria-hidden="true">
+                    <span>
+                        Good
+                        <br>
+                        Files
+                        <br>
+                        Go Far
+                        <i>♥</i>
+                    </span>
+                </div>
+                <div class="packing-copy">
+                    <h2 id="packing-title">
+                        Every good thing
+                        <br>
+                        starts with a drop.
+                    </h2>
+                    <p>
+                        Pick a file to pack it up
+                        <span aria-hidden="true">⤵</span>
+                    </p>
+                </div>
+                <label class="drop-box">
+                    <input
+                        type="file"
+                        multiple
+                        aria-label="Choose files to pack — preview only, files will not be sent"
+                    >
+                    <span class="box-back" aria-hidden="true"></span>
+                    <span class="box-flap flap-left" aria-hidden="true"></span>
+                    <span class="box-flap flap-right" aria-hidden="true"></span>
+                    <span class="box-front">
+                        <svg viewBox="0 0 200 190" aria-hidden="true">
+                            <use href="#parachute" />
+                            <path
+                                d="M72 171c-25 2-28-27-8-33c1-22 33-27 43-8c24-12 43 19 24 32c-7 20-31 17-38 8c-6 7-15 8-21 1Z"
+                                fill="#fffdf5"
+                                stroke="#725036"
+                                stroke-width="6"
+                            />
+                        </svg>
+                        <span>
+                            Choose files
+                            <span aria-hidden="true">＋</span>
+                        </span>
+                    </span>
+                </label>
+                <div class="books" aria-hidden="true">
+                    <span>SHARE</span>
+                    <span>GOOD STUFF</span>
+                    <span>BRIGHTER DAYS</span>
+                </div>
+                <p class="preview-note">
+                    A preview of softer sharing. Files stay on your device; peer-to-peer delivery is coming next.
+                </p>
+            </section>
+        </main>
+
+        <footer>
+            <span>Made for a little give &amp; take.</span>
+        </footer>
+    </body>
+</html>

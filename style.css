@@ -1,0 +1,534 @@
+/* Page styles: shared defaults, header, content, file picker, and footer.
+ * Decorative scenery is kept separately in background.css.
+ */
+
+/* Shared colors and base styles */
+:root {
+    --ink: #293d52;
+    --cream: #fffaf0;
+    --red: #ee7667;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* Use the visible viewport, including changes to mobile browser toolbars. */
+html {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    margin: 0;
+    color: var(--ink);
+    font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+    height: 100vh;
+    height: 100dvh;
+    overflow: clip;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    position: relative;
+    isolation: isolate;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.svg-library {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* Header and branding */
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 4%;
+    gap: 20px;
+}
+
+.wordmark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-icon {
+    width: 69px;
+    height: 78px;
+    transform: rotate(-9deg);
+}
+
+.brand-name {
+    display: block;
+    color: #fffdf4;
+    font-size: clamp(32px, 4.3vw, 57px);
+    font-weight: 900;
+    letter-spacing: -2.5px;
+    line-height: 1;
+    text-shadow: 0 3px 0 #356294, 2px 0 #356294, -2px 0 #356294, 0 -2px #356294;
+}
+
+.tagline {
+    display: block;
+    margin: 9px 0 0 4px;
+    font-size: clamp(13px, 1.6vw, 20px);
+    letter-spacing: 1px;
+    color: white;
+}
+
+.header-tools {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    align-self: flex-start;
+    padding-top: 6px;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eaf8f3cb;
+    min-height: 43px;
+    border: 1px solid #fff6;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.status {
+    padding: 0 18px;
+    gap: 9px;
+}
+
+.status-dot {
+    width: 9px;
+    height: 9px;
+    background: #d1974c;
+    border-radius: 50%;
+}
+
+/* The empty sky flexes so the packing station always fits on screen. */
+main {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+}
+
+/* Space reserved for incoming deliveries */
+.airspace {
+    position: relative;
+    min-height: 0;
+}
+
+/* Packing area and file picker */
+.packing-station {
+    position: relative;
+    height: 226px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 45px;
+    padding-bottom: 12px;
+    margin-top: 17px;
+}
+
+.packing-copy {
+    transform: rotate(-5deg);
+    padding-top: 20px;
+}
+
+h2 {
+    font-size: 23px;
+    line-height: 1.35;
+    margin: 0 0 8px;
+}
+
+.packing-copy p {
+    font-size: 13px;
+    margin: 0;
+}
+
+.packing-copy p span {
+    display: inline-block;
+    font-size: 38px;
+    vertical-align: middle;
+    margin-left: 7px;
+}
+
+.drop-box {
+    position: relative;
+    display: block;
+    width: 205px;
+    height: 172px;
+    margin-top: -6px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.drop-box:hover {
+    transform: translateY(-6px) rotate(1deg);
+}
+
+.drop-box input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+}
+
+.drop-box:focus-within {
+    outline: 3px dashed var(--ink);
+    outline-offset: 12px;
+    border-radius: 8px;
+}
+
+.box-back {
+    position: absolute;
+    left: 5px;
+    right: 5px;
+    top: 0;
+    height: 76px;
+    border: 3px solid #704b2e;
+    background: #9a683f;
+    border-radius: 4px;
+    box-shadow: inset 0 5px #f5cb8b;
+}
+
+.box-front {
+    position: absolute;
+    inset: 31px 0 0;
+    background: linear-gradient(100deg, #efbf7b, #e4ad66);
+    border: 3px solid #704b2e;
+    border-radius: 5px;
+    box-shadow: inset 5px 0 #f8d89a, inset -7px 0 #cb9254, 4px 5px 0 #704b2e33;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+}
+
+.box-front svg {
+    width: 81px;
+    height: 86px;
+    margin-top: 6px;
+    transform: rotate(12deg);
+}
+
+.box-front > span {
+    font-size: 13px;
+    font-weight: bold;
+    color: #604530;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: #fff0c64a;
+}
+
+.box-flap {
+    position: absolute;
+    width: 43px;
+    height: 62px;
+    top: 4px;
+    background: #e6b573;
+    border: 3px solid #704b2e;
+}
+
+.flap-left {
+    left: -20px;
+    transform: skew(-38deg) rotate(9deg);
+}
+
+.flap-right {
+    right: -20px;
+    transform: skew(38deg) rotate(-9deg);
+}
+
+.preview-note {
+    position: absolute;
+    bottom: 6px;
+    left: 15px;
+    right: 15px;
+    text-align: center;
+    margin: 0;
+    color: #fff8e7;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+/* Footer */
+footer {
+    min-height: 43px;
+    padding: 12px 4%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 25px;
+    background: #426846;
+    color: #eff5df;
+    font-size: 11px;
+}
+
+footer > span {
+    white-space: nowrap;
+    opacity: 0.8;
+}
+
+a:focus-visible {
+    outline: 3px solid var(--cream);
+    outline-offset: 5px;
+}
+
+/* Tablet layout */
+@media (max-width: 900px) {
+    .packing-station {
+        gap: 30px;
+    }
+
+    .packing-copy h2 {
+        font-size: 19px;
+    }
+
+    .packing-copy {
+        margin-left: 40px;
+    }
+
+    .drop-box {
+        width: 180px;
+    }
+}
+
+/* Phone layout */
+@media (max-width: 640px) {
+    .site-header {
+        padding: 20px 5%;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    .brand-icon {
+        width: 44px;
+        height: 58px;
+    }
+
+    .wordmark {
+        gap: 5px;
+    }
+
+    .brand-name {
+        font-size: 33px;
+        letter-spacing: -1.5px;
+    }
+
+    .tagline {
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        margin-top: 6px;
+    }
+
+    .header-tools {
+        gap: 0;
+        padding-top: 0;
+    }
+
+    .status {
+        font-size: 10px;
+        min-height: 31px;
+        padding: 0 10px;
+        gap: 5px;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+    }
+
+    .packing-station {
+        margin-top: 0;
+        height: 248px;
+        gap: 24px;
+        padding: 0 20px 35px;
+    }
+
+    .packing-copy {
+        margin: 0;
+        max-width: 145px;
+    }
+
+    .packing-copy h2 {
+        font-size: 17px;
+    }
+
+    .packing-copy p {
+        font-size: 11px;
+    }
+
+    .packing-copy p span {
+        display: block;
+        text-align: right;
+        line-height: 1;
+    }
+
+    .drop-box {
+        width: 145px;
+        height: 151px;
+    }
+
+    .box-front svg {
+        height: 72px;
+        width: 70px;
+    }
+
+    .box-front > span {
+        font-size: 11px;
+    }
+
+    .preview-note {
+        bottom: 15px;
+        max-width: 310px;
+        margin: auto;
+        font-size: 10px;
+    }
+
+    footer {
+        font-size: 10px;
+        padding: 14px 5%;
+    }
+}
+
+/* Smaller phones keep the header and box clear of the screen edges. */
+@media (max-width: 380px) {
+    .brand-icon {
+        width: 30px;
+        height: 44px;
+    }
+
+    .brand-name {
+        font-size: 27px;
+    }
+
+    .tagline {
+        font-size: 9px;
+    }
+
+    .status {
+        padding: 0 7px;
+        font-size: 9px;
+    }
+
+    .packing-station {
+        gap: 16px;
+    }
+
+    .packing-copy {
+        max-width: 115px;
+    }
+
+    .packing-copy h2 {
+        font-size: 15px;
+    }
+
+    .drop-box {
+        width: 120px;
+    }
+}
+
+/* Short screens, including phones held in landscape. */
+@media (max-height: 500px) {
+    .site-header {
+        padding: 8px 4%;
+        align-items: center;
+    }
+
+    .brand-icon {
+        width: 36px;
+        height: 42px;
+    }
+
+    .brand-name {
+        font-size: 29px;
+    }
+
+    .tagline {
+        font-size: 10px;
+        margin-top: 4px;
+    }
+
+    .header-tools {
+        padding-top: 0;
+    }
+
+    .status {
+        min-height: 30px;
+        font-size: 10px;
+    }
+
+    .packing-station {
+        height: 190px;
+        margin-top: 0;
+        padding-bottom: 28px;
+    }
+
+    .drop-box {
+        height: 138px;
+    }
+
+    .box-front svg {
+        width: 58px;
+        height: 62px;
+    }
+
+    .box-front > span {
+        font-size: 11px;
+    }
+
+    .packing-copy {
+        padding-top: 0;
+    }
+
+    .packing-copy h2 {
+        font-size: 17px;
+    }
+
+    .packing-copy p {
+        font-size: 11px;
+    }
+
+    .preview-note {
+        bottom: 8px;
+        font-size: 9px;
+    }
+
+    footer {
+        min-height: 26px;
+        padding: 6px 4%;
+        font-size: 10px;
+    }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .drop-box {
+        transition: none;
+    }
+}
