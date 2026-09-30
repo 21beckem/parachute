@@ -1,10 +1,13 @@
-/* One 15-second delivery. Dragging pauses its clock until it is released. */
+/* A constant-speed delivery: moving it higher gives it farther to fall. */
 (() => {
     const parachute = document.querySelector('.falling-parachute');
     const desk = document.querySelector('.desk');
     const duration = 15000;
 
-    let remainingTime = duration;
+    const artwork = parachute.querySelector('svg');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let fallSpeed = 0;
+    let swayTime = 0;
     let lastFrame = null;
     let activePointer = null;
     let keyboardPaused = false;
@@ -29,6 +32,9 @@
 
     function render() {
         parachute.style.transform = `translate(${x}px, ${y}px)`;
+        // Rock around the canopy while the delivery's path stays vertical.
+        const angle = reducedMotion.matches ? 0 : Math.sin(swayTime / 650) * 7;
+        artwork.style.transform = `rotate(${angle}deg)`;
     }
 
     function finishDelivery() {
@@ -46,14 +52,11 @@
         lastFrame = timestamp;
 
         if (activePointer === null && !keyboardPaused) {
-            const step = Math.min(elapsed, remainingTime);
-
-            // Recalculate the remaining path after a drag or viewport resize.
-            y += (landingY - y) * (step / remainingTime);
-            remainingTime -= step;
+            y = Math.min(landingY, y + fallSpeed * elapsed);
+            swayTime += elapsed;
             render();
 
-            if (remainingTime <= 0) {
+            if (y >= landingY) {
                 finishDelivery();
                 return;
             }
@@ -78,7 +81,7 @@
         if (event.pointerId !== activePointer) return;
 
         x = clamp(event.clientX - grabOffsetX, 0, window.innerWidth - parachute.offsetWidth);
-        y = clamp(event.clientY - grabOffsetY, 0, window.innerHeight - parachute.offsetHeight);
+        y = clamp(event.clientY - grabOffsetY, -parachute.offsetHeight, landingY);
         render();
     });
 
@@ -121,7 +124,7 @@
 
         event.preventDefault();
         x = clamp(x + move[0], 0, window.innerWidth - parachute.offsetWidth);
-        y = clamp(y + move[1], 0, landingY);
+        y = clamp(y + move[1], -parachute.offsetHeight, landingY);
         render();
         if (y >= landingY) finishDelivery();
     });
@@ -130,12 +133,14 @@
         if (finished) return;
         measureScene();
         render();
+        if (y >= landingY) finishDelivery();
     });
 
     parachute.hidden = false;
     x = (window.innerWidth - parachute.offsetWidth) / 2;
     y = -parachute.offsetHeight;
     measureScene();
+    fallSpeed = (landingY - y) / duration;
     render();
     requestAnimationFrame(animate);
 })();

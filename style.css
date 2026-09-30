@@ -566,6 +566,8 @@ a:focus-visible {
     display: block;
     width: 100%;
     pointer-events: none;
+    transform-origin: 50% 12%;
+    will-change: transform;
 }
 
 .falling-parachute.is-grabbed {
