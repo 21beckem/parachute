@@ -89,7 +89,7 @@
                 <button
                     class="falling-parachute"
                     type="button"
-                    aria-label="Grab delivery. Space pauses or resumes; arrow keys move it."
+                    aria-label="Grab delivery and release the file over the box opening to put it in. Space pauses or resumes; arrow keys move it; Enter places it in the box."
                     aria-pressed="false"
                     hidden
                 >
@@ -128,16 +128,32 @@
                         starts with a drop.
                     </h2>
                     <p>
-                        Pick a file to pack it up
+                        Send with a rocket.<br>Catch a little joy.
                         <span aria-hidden="true">⤵</span>
                     </p>
                 </div>
-                <label class="drop-box">
-                    <input
-                        type="file"
-                        multiple
-                        aria-label="Choose files to pack — preview only, files will not be sent"
-                    >
+                <div class="rocket-pad">
+                    <div class="rocket">
+                        <svg viewBox="0 0 160 240" aria-hidden="true">
+                            <g stroke="#293d52" stroke-width="4" stroke-linejoin="round">
+                                <path class="rocket-flame" d="M62 192Q46 220 80 237Q113 216 98 192Z" fill="#ffbe55" />
+                                <path d="M49 128Q15 139 19 188L53 170M111 128Q145 139 141 188L107 170" fill="#ed7667" />
+                                <path d="M47 172C35 115 43 53 80 12C117 53 125 115 113 172Z" fill="#fffaf0" />
+                                <path d="M55 49Q80 3 105 49Z" fill="#ed7667" />
+                                <path d="M47 170H113L106 191H54Z" fill="#72b8cf" />
+                                <circle cx="80" cy="83" r="22" fill="#78c9ee" />
+                                <path d="M68 80Q70 68 83 70" fill="none" stroke="#fffaf0" stroke-linecap="round" />
+                                <path d="M80 154V198" stroke="#ed7667" stroke-width="9" stroke-linecap="round" />
+                            </g>
+                        </svg>
+                        <label class="rocket-upload">
+                            <span>Upload file ↑</span>
+                            <input type="file" multiple aria-label="Upload files to launch the rocket — local preview only">
+                        </label>
+                    </div>
+                    <span class="launch-pad" aria-hidden="true"></span>
+                </div>
+                <div class="drop-box" role="img" aria-label="Open receiving box">
                     <span class="box-back" aria-hidden="true"></span>
                     <span class="box-flap flap-left" aria-hidden="true"></span>
                     <span class="box-flap flap-right" aria-hidden="true"></span>
@@ -152,11 +168,10 @@
                             />
                         </svg>
                         <span>
-                            Choose files
-                            <span aria-hidden="true">＋</span>
+                            Incoming files
                         </span>
                     </span>
-                </label>
+                </div>
                 <div class="books" aria-hidden="true">
                     <span>SHARE</span>
                     <span>GOOD STUFF</span>
@@ -165,6 +180,7 @@
                 <p class="preview-note">
                     A preview of softer sharing. Files stay on your device; peer-to-peer delivery is coming next.
                 </p>
+                <p class="visually-hidden delivery-status" role="status" aria-live="polite"></p>
             </section>
         </main>
 
