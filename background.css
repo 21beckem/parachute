@@ -135,7 +135,7 @@
     background-position: 8px 0, 31px 20px;
 }
 
-/* Desk, mug, and books */
+/* Desk */
 .desk {
     position: absolute;
     z-index: -1;
@@ -147,107 +147,7 @@
     box-shadow: 0 -8px 0 #eac787;
 }
 
-.mug {
-    position: absolute;
-    left: 10%;
-    bottom: 37px;
-    width: 78px;
-    height: 93px;
-    background: #fff1d4;
-    border: 3px solid #7c6046;
-    border-radius: 6px 6px 24px 24px;
-    box-shadow: inset -7px 0 #e7d3af;
-    transform: rotate(-3deg);
-}
-
-.mug::before {
-    content: '';
-    position: absolute;
-    left: -25px;
-    top: 16px;
-    width: 25px;
-    height: 46px;
-    border: 7px solid #f7e5c3;
-    outline: 3px solid #7c6046;
-    border-radius: 40% 0 0 45%;
-    z-index: -1;
-}
-
-.mug::after {
-    content: '';
-    position: absolute;
-    left: -3px;
-    top: -8px;
-    width: 78px;
-    height: 17px;
-    border: 3px solid #7c6046;
-    border-radius: 50%;
-    background: #bda27d;
-    box-shadow: inset 0 3px #f9e8c5;
-}
-
-.mug span {
-    display: block;
-    text-align: center;
-    font-size: 14px;
-    font-weight: bold;
-    line-height: 1.15;
-    padding-top: 17px;
-    color: #6d5842;
-}
-
-.mug i {
-    display: block;
-    color: #c76f59;
-    font-style: normal;
-}
-
-.books {
-    position: absolute;
-    right: 6%;
-    bottom: 36px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    transform: rotate(4deg);
-}
-
-.books span {
-    padding: 7px 22px;
-    border: 3px solid #69533e;
-    border-radius: 7px 3px 3px 7px;
-    background: #739cc1;
-    font-size: 12px;
-    letter-spacing: 1px;
-    font-weight: bold;
-    color: #fff0d7;
-    box-shadow: inset 6px 0 #ffffff26;
-}
-
-.books span:nth-child(2) {
-    background: #c58c59;
-    margin-right: 7px;
-}
-
-.books span:nth-child(3) {
-    background: #f2deb0;
-    color: #796145;
-    margin-right: 0;
-}
-
 /* Responsive scenery */
-@media (max-width: 900px) {
-    .mug {
-        left: 5%;
-    }
-
-    .books {
-        right: 3%;
-        transform: rotate(4deg) scale(0.8);
-        transform-origin: right bottom;
-    }
-}
-
 @media (max-width: 640px) {
     .cloud-three {
         top: 37%;
@@ -272,10 +172,6 @@
         top: 74%;
     }
 
-    .mug,
-    .books {
-        display: none;
-    }
 
     .desk {
         top: 53px;

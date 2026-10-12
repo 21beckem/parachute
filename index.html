@@ -6,12 +6,14 @@
         <meta name="theme-color" content="#549ff0">
         <meta
             name="description"
-            content="Parachute — a playful concept for sending files and folders straight to a friend."
+            content="Parachute — connect with a friend and drop a parachute into their sky."
         >
-        <title>Parachute — Drop files. Spread joy.</title>
+        <title>Parachute</title>
         <link rel="stylesheet" href="background.css">
         <link rel="stylesheet" href="style.css">
+        <script src="vendor/peerjs.min.js" defer></script>
         <script src="parachute.js" defer></script>
+        <script src="connection.js" defer></script>
     </head>
     <body>
         <!-- Reusable artwork for the branding and draggable delivery. -->
@@ -39,6 +41,27 @@
                         <path d="m53 85 38 73m56-73-38 73M100 82v76" fill="none" />
                     </g>
                 </symbol>
+                <symbol id="payload-file" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="73" y="157" width="54" height="61" rx="5" fill="#fffaf0"/><path d="M85 174h30M85 185h30M85 196h19" stroke="#5c9fe8"/></g>
+                </symbol>
+                <symbol id="payload-folder" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M61 170v-12q0-5 5-5h23l9 10h35q6 0 6 6v43q0 6-6 6H66q-5 0-5-6Z" fill="#e8ac50"/><path d="M61 174h78v38q0 6-6 6H66q-5 0-5-6Z" fill="#ffd779"/><path d="M108 175v22" stroke="#8a6247" stroke-dasharray="2 5"/><rect x="103" y="197" width="10" height="12" rx="3" fill="#fffaf0"/></g>
+                </symbol>
+                <symbol id="payload-music" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="66" y="155" width="68" height="65" rx="12" fill="#bba0e3"/><path d="M92 201v-28l27-6v28M92 181l27-6" fill="none"/><ellipse cx="85" cy="203" rx="8" ry="6" fill="#fffaf0"/><ellipse cx="112" cy="197" rx="8" ry="6" fill="#fffaf0"/></g>
+                </symbol>
+                <symbol id="payload-link" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="63" y="155" width="74" height="65" rx="12" fill="#85cfd2"/><g transform="rotate(-35 100 187)" fill="none" stroke="#fffaf0" stroke-width="7"><rect x="73" y="178" width="33" height="19" rx="9"/><rect x="95" y="178" width="33" height="19" rx="9"/><path d="M93 187h15"/></g></g>
+                </symbol>
+                <symbol id="payload-picture" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="61" y="154" width="78" height="66" rx="5" fill="#fffaf0"/><path d="M68 162h64v43H68Z" fill="#8bcff1"/><circle cx="116" cy="173" r="6" fill="#ffd779" stroke="none"/><path d="m68 205 20-25 15 17 10-12 19 20Z" fill="#8bb968"/><path d="M92 212h16" stroke="#b6c4cb"/></g>
+                </symbol>
+                <symbol id="payload-video" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="61" y="159" width="78" height="59" rx="7" fill="#ed8879"/><path d="M63 170h74M63 207h74"/><path d="M73 162v5m14-5v5m14-5v5m14-5v5m14-5v5M73 211v4m14-4v4m14-4v4m14-4v4m14-4v4" stroke="#fffaf0" stroke-width="4"/><path d="m94 178 17 11-17 11Z" fill="#fffaf0"/></g>
+                </symbol>
+                <symbol id="payload-other" viewBox="0 0 200 230">
+                    <g stroke="#293d52" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m67 171 33-15 33 15v38l-33 13-33-13Z" fill="#e8ac76"/><path d="m67 171 33 14 33-14M100 185v37" fill="none"/><path d="m86 163 33 14v14l-11 5v-15l-33-14" fill="#ffe3a0"/><path d="m77 194 12 5" stroke="#fffaf0"/></g>
+                </symbol>
             </defs>
         </svg>
 
@@ -55,7 +78,7 @@
             <div class="wildflowers"></div>
         </div>
 
-        <!-- Branding and preview status. -->
+        <!-- Branding and peer connection controls. -->
         <header class="site-header">
             <a class="wordmark" href="index.html" aria-label="Parachute home">
                 <svg class="brand-icon" viewBox="0 0 200 190" aria-hidden="true">
@@ -69,89 +92,87 @@
                 </svg>
                 <span>
                     <span class="brand-name">Parachute</span>
-                    <span class="tagline">Drop files. Spread joy.</span>
                 </span>
             </a>
             <div class="header-tools">
-                <span class="status">
-                    <span class="status-dot"></span>
-                    Preview mode
-                </span>
+                <details class="connection-panel" open>
+                    <summary class="status"><span class="status-dot"></span><span id="connection-state">Getting your ID…</span></summary>
+                    <div class="connection-card">
+                        <label for="local-peer-id">Your connection ID</label>
+                        <div class="connection-row">
+                            <input id="local-peer-id" readonly placeholder="Getting your ID…" spellcheck="false">
+                            <button id="copy-peer-id" type="button" disabled>Copy</button>
+                        </div>
+                        <form id="connect-form">
+                            <label for="remote-peer-id">Connect to a friend</label>
+                            <div class="connection-row">
+                                <input id="remote-peer-id" placeholder="Paste their ID" maxlength="128" autocomplete="off" spellcheck="false" required>
+                                <button id="connect-peer" type="submit" disabled>Connect</button>
+                            </div>
+                        </form>
+                        <div class="connection-actions">
+                            <button id="disconnect-peer" type="button" hidden>Disconnect</button>
+                            <button id="retry-peer" type="button" hidden>Retry</button>
+                        </div>
+                        <p id="connection-message" role="status" aria-live="polite">Share your ID, or enter a friend's. Keep both pages open.</p>
+                        <p class="connection-note">Parachutes only for now. File sharing is coming later.</p>
+                    </div>
+                </details>
             </div>
         </header>
 
         <main>
             <section class="airspace" aria-labelledby="scene-title">
                 <h1 id="scene-title" class="visually-hidden">
-                    A little drop. A soft landing.
+                    Incoming parachutes
                 </h1>
-                <!-- One demonstration delivery; movement is handled in parachute.js. -->
+                <!-- Hidden delivery template; each API call clones its own parachute. -->
                 <button
                     class="falling-parachute"
                     type="button"
-                    aria-label="Grab delivery and release the file over the box opening to put it in. Space pauses or resumes; arrow keys move it; Enter places it in the box."
+                    aria-label="Grab delivery and release with your pointer anywhere on the box to put it in. Space pauses or resumes; arrow keys move it; Enter places it in the box."
                     aria-pressed="false"
                     hidden
                 >
                     <svg viewBox="0 0 200 230" aria-hidden="true">
                         <use href="#parachute" width="200" height="190" />
-                        <rect
-                            x="73" y="157" width="54" height="61" rx="5"
-                            fill="#fffaf0" stroke="#293d52" stroke-width="4"
-                        />
-                        <path
-                            d="M85 174h30M85 185h30M85 196h19"
-                            fill="none" stroke="#5c9fe8" stroke-width="4"
-                            stroke-linecap="round"
-                        />
+                        <use class="delivery-art" href="#payload-file" />
                     </svg>
                 </button>
             </section>
 
-            <!-- File picker and the decorative packing desk. -->
-            <section class="packing-station" aria-labelledby="packing-title">
+            <!-- Parachute launcher and receiving box. -->
+            <section class="packing-station" aria-label="Send and receive parachutes">
                 <div class="desk" aria-hidden="true"></div>
-                <div class="mug" aria-hidden="true">
-                    <span>
-                        Good
-                        <br>
-                        Files
-                        <br>
-                        Go Far
-                        <i>♥</i>
-                    </span>
-                </div>
-                <div class="packing-copy">
-                    <h2 id="packing-title">
-                        Every good thing
-                        <br>
-                        starts with a drop.
-                    </h2>
-                    <p>
-                        Send with a rocket.<br>Catch a little joy.
-                        <span aria-hidden="true">⤵</span>
-                    </p>
-                </div>
                 <div class="rocket-pad">
                     <div class="rocket">
-                        <svg viewBox="0 0 160 240" aria-hidden="true">
-                            <g stroke="#293d52" stroke-width="4" stroke-linejoin="round">
-                                <path class="rocket-flame" d="M62 192Q46 220 80 237Q113 216 98 192Z" fill="#ffbe55" />
-                                <path d="M49 128Q15 139 19 188L53 170M111 128Q145 139 141 188L107 170" fill="#ed7667" />
-                                <path d="M47 172C35 115 43 53 80 12C117 53 125 115 113 172Z" fill="#fffaf0" />
-                                <path d="M55 49Q80 3 105 49Z" fill="#ed7667" />
-                                <path d="M47 170H113L106 191H54Z" fill="#72b8cf" />
-                                <circle cx="80" cy="83" r="22" fill="#78c9ee" />
-                                <path d="M68 80Q70 68 83 70" fill="none" stroke="#fffaf0" stroke-linecap="round" />
-                                <path d="M80 154V198" stroke="#ed7667" stroke-width="9" stroke-linecap="round" />
+                        <svg viewBox="0 0 120 360" aria-hidden="true">
+                            <g stroke="#293d52" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                <g class="rocket-flame">
+                                    <path d="M43 310Q32 335 60 357Q88 335 77 310Z" fill="#ffb64f" />
+                                    <path d="M52 313Q47 333 60 343Q73 333 68 313Z" fill="#fff1a8" stroke="none" />
+                                </g>
+                                <!-- Escape tower and tapered command module. -->
+                                <path d="M60 5V27M55 28H65L68 45H52Z" fill="#fffaf0" />
+                                <path d="M55 29 65 43M65 29 55 43" fill="none" stroke-width="2" />
+                                <path d="M52 46H68L74 67H46Z" fill="#fffaf0" />
+                                <path d="M46 67H74V112L84 145V294H36V145L46 112Z" fill="#fffaf0" />
+                                <path d="M67 69H72V113L81 146V292H71V145L65 112Z" fill="#d3dfdf" stroke="none" />
+                                <!-- Saturn V stage bands and alternating black panels. -->
+                                <path d="M46 73H74V83H46ZM46 108H74V117H46ZM36 150H84V164H36ZM36 216H84V228H36Z" fill="#293d52" stroke="none" />
+                                <path d="M37 166H46V191H37ZM56 166H64V191H56ZM74 166H83V191H74ZM37 267H46V294H37ZM56 267H64V294H56ZM74 267H83V294H74Z" fill="#293d52" stroke="none" />
+                                <path d="M39 201H81M39 207H81M40 237V257M45 237V257M75 237V257M80 237V257" fill="none" stroke="#b6c4cb" stroke-width="1.5" />
+                                <path d="M36 273 20 304H36M84 273 100 304H84" fill="#d3dfdf" />
+                                <path d="M36 294H84L79 305H41Z" fill="#293d52" />
+                                <path d="M44 305H54L56 315H41ZM66 305H76L79 315H64Z" fill="#617184" />
+                                <path d="M58 281H62L65 307H55Z" fill="#fffaf0" />
+                                <path d="M53 128H67" stroke="#ee7667" stroke-width="5" />
                             </g>
                         </svg>
-                        <label class="rocket-upload">
-                            <span>Upload file ↑</span>
-                            <input type="file" multiple aria-label="Upload files to launch the rocket — local preview only">
-                        </label>
                     </div>
+                    <div class="rocket-smoke" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
                     <span class="launch-pad" aria-hidden="true"></span>
+                    <button id="send-parachute" class="rocket-upload" type="button" disabled>Drop parachute ↑</button>
                 </div>
                 <div class="drop-box" role="img" aria-label="Open receiving box">
                     <span class="box-back" aria-hidden="true"></span>
@@ -168,24 +189,12 @@
                             />
                         </svg>
                         <span>
-                            Incoming files
+                            Incoming parachutes
                         </span>
                     </span>
                 </div>
-                <div class="books" aria-hidden="true">
-                    <span>SHARE</span>
-                    <span>GOOD STUFF</span>
-                    <span>BRIGHTER DAYS</span>
-                </div>
-                <p class="preview-note">
-                    A preview of softer sharing. Files stay on your device; peer-to-peer delivery is coming next.
-                </p>
                 <p class="visually-hidden delivery-status" role="status" aria-live="polite"></p>
             </section>
         </main>
-
-        <footer>
-            <span>Made for a little give &amp; take.</span>
-        </footer>
     </body>
 </html>
