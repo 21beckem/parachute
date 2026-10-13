@@ -17,12 +17,12 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 ## Architecture
 
 * [ ] Web tech(html/css/js)
-* [x] Peer.js
+* [x] Shared Node.js relay with connection codes
 
 ## Software Features
 
 * [ ] File share
-* [x] Peer 2 peer (parachute animation messages)
+* [x] Two-computer connections (parachute animation messages)
 * [ ] Keep going ....
 
 ## Team Communication
@@ -48,30 +48,48 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 
 ## Connect two computers
 
-Serve this folder with a static web server, or publish it to an HTTPS static
-host. Open the site on both computers with internet access. Each page gets a
-unique session ID in the connection panel (refreshing creates a new ID).
+Run `node server.cjs` from this folder with Node.js 20 or later. There are no
+dependencies to install. `npm start` also works if npm is installed.
+The server serves both the website and the shared connection service.
 
-1. Copy the ID on one computer and share it with the other person.
-2. Paste it into **Connect to a friend** on the other computer and click **Connect**.
-3. Once both pages say **Connected**, click **Drop parachute ↑** on either page.
-   The rocket launches on the sender's page and a parachute arrives on the
-   other page. Drag it into the receiving box as before.
-4. Use **Disconnect** to end the connection, or **Cancel** while connecting.
+For two computers on the **same Wi-Fi**, open the **Same Wi-Fi** URL printed
+in the terminal on both computers (for example `http://192.168.1.25:3000`).
+Keep the server running. If Windows asks, allow Node on your private network.
+The other computer must use this network address; its own `localhost` points
+to itself. Guest Wi-Fi may isolate devices; use a network that allows them
+to reach the computer running the server.
 
-Only one friend connects at a time. Keep both pages open. File selection is
-removed from the interface; the only network message is
-`{ type: 'parachute', version: 1 }`. Receiving that message invokes the existing
-animation with an empty payload. Other message types and extra fields are ignored.
+For computers on **different networks**, deploy this folder to a Node-capable
+host with start command `node server.cjs`, and open the same public HTTPS URL
+on both computers. The server honors the host's `PORT` environment variable.
+Use one running server instance; connection codes live in its memory and reset
+when it restarts. If using a reverse proxy, preserve the public Host header,
+disable buffering for `/api/events`, and allow long-running event streams.
+Static-only hosting (including GitHub Pages), opening `index.html` directly,
+or running separate servers on each computer does not provide a shared relay.
 
-PeerJS 1.5.5 is bundled in `vendor/` with its MIT license. Its default public
-PeerServer Cloud brokers connections; WebRTC carries the animation command
-between browsers. No application backend or build step is needed. Some
-firewalls/NAT configurations can block direct connections; the panel provides
-timeouts and retry. A production deployment may need its own signaling and
-TURN service for those networks. See the [PeerJS documentation](https://peerjs.com/client/getting-started).
+1. Click the connection badge at the top right to open its dropdown.
+2. Copy your code (such as `ABCD-2345`) and share it with the other person.
+3. On the other computer, enter that code under **Connect to a friend** and
+   click **Connect**. Only one person needs to enter a code.
+4. Once both badges say **Connected**, click **Drop parachute ↑** on either
+   page. The rocket launches locally and a parachute arrives on the other page.
+5. Use **Disconnect** to unpair, or **Retry** after losing the server connection.
+   Refreshing or retrying creates a new code. Keep both pages open.
 
-Run checks with `node --test tests/*.test.cjs`.
+The dropdown starts closed; clicking outside it or pressing Escape closes it.
+Only one friend connects at a time. File sharing is not implemented. Only the
+animation command `{ type: 'parachute', version: 1 }` reaches the recipient.
+The relay rejects file payloads and extra fields, and routes messages only
+between the paired sessions. It uses HTTP POST and server-sent events so the
+two browsers do not need a direct WebRTC connection or a TURN service.
+Anyone you share your code with can connect while it is available.
+
+Run all animation, connection-controller, and real HTTP relay checks with
+`node --test tests/*.test.cjs` (or `npm test`). The relay tests open independent
+client streams and verify pairing, delivery in both directions, disconnects,
+invalid requests, and reconnecting. Two physical computers must still be
+checked using the shared URL in your network or deployment.
 
 ## Animation API
 

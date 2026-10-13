@@ -3,135 +3,107 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+const tick = () => new Promise(resolve => setImmediate(resolve));
 
-class Emitter {
-    constructor() { this.events = {}; }
-    on(name, fn) { (this.events[name] ||= []).push(fn); }
-    emit(name, value) { for (const fn of this.events[name] || []) fn(value); }
-}
-class Channel extends Emitter {
-    constructor(id = 'friend') { super(); this.peer = id; this.label = 'parachute-v1'; this.open = false; this.sent = []; }
-    close() { this.open = false; this.closed = true; this.emit('close'); }
-    send(data) { this.sent.push(data); }
-}
-function setup() {
-    const elements = {};
-    const panel = { dataset: {} };
-    const document = { getElementById: id => elements[id] ||= {
-        value: '', addEventListener() {}, closest: () => panel, focus() {}, select() {}
-    } };
-    const peers = [], timers = new Map();
-    let clock = 0, drops = 0, launches = 0;
-    class Peer extends Emitter {
-        constructor() { super(); peers.push(this); this.id = 'self'; }
-        connect(id, options) { this.options = options; return this.channel = new Channel(id); }
-        destroy() { this.destroyed = true; this.emit('close'); }
+async function setup() {
+    const elements = {}, listeners = {}, streams = [], requests = [];
+    const panel = { dataset: {}, contains: target => target === panel, open: false, querySelector: () => ({ focus() {} }) };
+    const document = {
+        addEventListener: (event, fn) => listeners[event] = fn,
+        getElementById: id => elements[id] ||= {
+            value: '', addEventListener() {}, closest: () => panel, focus() {}, select() {}
+        }
+    };
+    let drops = 0;
+    class EventSource {
+        constructor() { streams.push(this); }
+        close() { this.closed = true; }
+        emit(data) { this.onmessage({ data: JSON.stringify(data) }); }
     }
     const window = {
-        Peer, addEventListener() {}, ParachuteAnimation: { deliveries: new Set() },
-        animation: { startConnecting() {}, stopConnecting() {},
-            launchRocket: async () => { launches++; return true; },
+        addEventListener() {}, ParachuteAnimation: { deliveries: new Set() },
+        animation: { startConnecting() {}, stopConnecting() {}, launchRocket: async () => true,
             dropParachute: payload => { assert.equal(payload.length, 0); drops++; } }
     };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../connection.js'), 'utf8'), {
-        window, document, navigator: {},
-        setTimeout: fn => { timers.set(++clock, fn); return clock; },
-        clearTimeout: id => timers.delete(id)
+        window, document, navigator: {}, EventSource, AbortSignal, setTimeout, clearTimeout,
+        fetch: async (url, options) => {
+            requests.push({ url, options });
+            return { ok: true, json: async () => ({ code: 'ABCD2345', token: 'secret' }) };
+        }
     });
-    const controller = window.parachuteConnection;
-    peers[0].emit('open', 'self');
-    return { controller, peers, timers, window, elements, panel, drops: () => drops, launches: () => launches };
+    await tick();
+    streams[0].emit({ type: 'ready', partner: null });
+    return { c: window.parachuteConnection, window, streams, requests, panel, listeners, drops: () => drops };
 }
 
-test('connects by trimmed ID, sends only the animation command and receives empty parachutes', async () => {
-    const s = setup(), c = s.controller;
-    assert.equal(c.local.value, 'self');
+test('formats codes, joins, sends only parachutes, receives, and closes dropdown', async t => {
+    const s = await setup(), c = s.c;
+    t.after(() => c.destroy());
+    assert.equal(c.local.value, 'ABCD-2345');
     assert.equal(c.send.disabled, true);
-    c.remote.value = ' friend ';
-    c.connectToPeer();
-    const channel = c.connection;
-    assert.equal(channel.peer, 'friend');
-    channel.open = true; channel.emit('open');
-    assert.equal(c.send.disabled, false);
+    c.remote.value = ' efgh-6789 ';
+    await c.connectToPeer();
+    assert.equal(s.requests.at(-1).options.body, '{"code":"EFGH6789"}');
+    s.streams[0].emit({ type: 'connected', code: 'EFGH6789', pairId: 'pair' });
     await c.sendParachute();
-    assert.equal(JSON.stringify(channel.sent), '[{"type":"parachute","version":1}]');
-    assert.equal(s.drops(), 0, 'sending does not drop locally');
-    assert.equal(s.launches(), 1);
-    channel.emit('data', { type: 'parachute', version: 1 });
-    assert.equal(s.drops(), 1);
-    for (const data of [null, 'parachute', { type: 'file' }, { type: 'parachute', version: 2 },
-        { type: 'parachute', version: 1, files: ['secret.txt'] }]) channel.emit('data', data);
-    assert.equal(s.drops(), 1, 'unknown and file payloads are ignored');
-});
-
-test('accepts incoming connections, rejects extra peers, and supports sending back', async () => {
-    const s = setup(), c = s.controller, incoming = new Channel();
-    s.peers[0].emit('connection', incoming);
-    incoming.open = true; incoming.emit('open');
-    await c.sendParachute();
-    assert.equal(incoming.sent.length, 1);
-    const extra = new Channel('someone-else');
-    s.peers[0].emit('connection', extra);
-    assert.equal(extra.closed, true);
-    incoming.close();
-    assert.equal(c.connection, null);
-    assert.equal(c.send.disabled, true);
-    assert.equal(c.connect.disabled, false);
-});
-
-test('self IDs, malformed IDs, unavailable peers, cancellation and timeout recover', () => {
-    const s = setup(), c = s.controller;
-    for (const id of ['self', 'bad/id', '']) { c.remote.value = id; c.connectToPeer(); assert.equal(c.connection, null); }
-    c.remote.value = 'missing'; c.connectToPeer();
-    s.peers[0].emit('error', { type: 'peer-unavailable' });
-    assert.equal(c.connection, null);
-    assert.equal(c.connect.disabled, false);
-    c.connectToPeer();
-    for (const fn of [...s.timers.values()]) fn();
-    assert.equal(c.connection, null);
-    assert.match(c.message.textContent, /timed out/);
-    c.connectToPeer();
-    const old = c.connection;
-    c.closeConnection('Cancelled.');
-    old.open = true; old.emit('open');
-    old.emit('data', { type: 'parachute', version: 1 });
-    assert.equal(c.send.disabled, true);
+    assert.equal(s.requests.at(-1).options.body, '{"type":"parachute","version":1,"code":"EFGH6789","pairId":"pair"}');
     assert.equal(s.drops(), 0);
+    s.streams[0].emit({ type: 'parachute', version: 1 });
+    s.streams[0].emit({ type: 'parachute', version: 1, files: ['secret'] });
+    assert.equal(s.drops(), 1);
+    s.panel.open = true;
+    s.listeners.click({ target: {} });
+    assert.equal(s.panel.open, false);
+    s.panel.open = true;
+    s.listeners.keydown({ key: 'Escape' });
+    assert.equal(s.panel.open, false);
 });
 
-test('disconnect during launch prevents sending to a closed or replacement connection', async () => {
-    const s = setup(), c = s.controller;
-    c.remote.value = 'friend'; c.connectToPeer();
-    const channel = c.connection;
-    channel.open = true; channel.emit('open');
+test('invalid and self codes are rejected; disconnect during launch prevents sending', async t => {
+    const s = await setup(), c = s.c;
+    t.after(() => c.destroy());
+    for (const code of ['', 'bad/id', 'ABCD-2345']) {
+        c.remote.value = code;
+        await c.connectToPeer();
+        assert.equal(s.requests.length, 1);
+    }
+    s.streams[0].emit({ type: 'connected', code: 'EFGH6789' });
     let finish;
-    s.window.animation.launchRocket = () => new Promise(resolve => { finish = resolve; });
+    s.window.animation.launchRocket = () => new Promise(resolve => finish = resolve);
     const flight = c.sendParachute();
-    await c.sendParachute(); // No overlapping send.
-    channel.close();
-    finish(true); await flight;
-    assert.equal(channel.sent.length, 0);
+    s.streams[0].emit({ type: 'disconnected' });
+    finish(true);
+    await flight;
+    assert.equal(s.requests.length, 1);
     assert.equal(c.send.disabled, true);
 });
 
-test('service failure and retry ignore stale events and clean up the previous peer', () => {
-    const s = setup(), c = s.controller, old = s.peers[0];
-    old.emit('error', { type: 'network' });
-    assert.equal(old.destroyed, true);
+test('service loss disables sending; retry discards stale events', async t => {
+    const s = await setup(), c = s.c;
+    t.after(() => c.destroy());
+    const old = s.streams[0];
+    old.onerror();
+    assert.equal(old.closed, true);
     assert.equal(c.retry.hidden, false);
-    c.start();
-    old.emit('open', 'stale');
-    assert.equal(c.local.value, '');
-    s.peers[1].emit('open', 'new-id');
-    assert.equal(c.local.value, 'new-id');
-    assert.equal(c.connect.disabled, false);
+    assert.equal(c.ready, false);
+    await c.start();
+    old.emit({ type: 'connected', code: 'OLD23456' });
+    assert.equal(c.partner, null);
+    s.streams[1].emit({ type: 'ready', partner: null });
+    assert.equal(c.ready, true);
 });
 
-test('simultaneous connection attempts deterministically keep the same channel', () => {
-    const s = setup(), c = s.controller;
-    c.remote.value = 'friend'; c.connectToPeer();
-    const outgoing = c.connection, incoming = new Channel('friend');
-    s.peers[0].emit('connection', incoming);
-    assert.equal(outgoing.closed, true); // self > friend; keep the incoming dial.
-    assert.equal(c.connection, incoming);
+test('reconnecting to the same friend during launch does not send the old parachute', async t => {
+    const s = await setup(), c = s.c;
+    t.after(() => c.destroy());
+    s.streams[0].emit({ type: 'connected', code: 'EFGH6789', pairId: 'first' });
+    let finish;
+    s.window.animation.launchRocket = () => new Promise(resolve => finish = resolve);
+    const flight = c.sendParachute();
+    s.streams[0].emit({ type: 'disconnected' });
+    s.streams[0].emit({ type: 'connected', code: 'EFGH6789', pairId: 'second' });
+    finish(true);
+    await flight;
+    assert.equal(s.requests.length, 1);
 });

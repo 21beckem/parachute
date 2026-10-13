@@ -11,7 +11,6 @@
         <title>Parachute</title>
         <link rel="stylesheet" href="background.css">
         <link rel="stylesheet" href="style.css">
-        <script src="vendor/peerjs.min.js" defer></script>
         <script src="parachute.js" defer></script>
         <script src="connection.js" defer></script>
     </head>
@@ -95,18 +94,18 @@
                 </span>
             </a>
             <div class="header-tools">
-                <details class="connection-panel" open>
-                    <summary class="status"><span class="status-dot"></span><span id="connection-state">Getting your ID…</span></summary>
+                <details class="connection-panel">
+                    <summary class="status"><span class="status-dot"></span><span id="connection-state">Connecting…</span></summary>
                     <div class="connection-card">
-                        <label for="local-peer-id">Your connection ID</label>
+                        <label for="local-peer-id">Your connection code</label>
                         <div class="connection-row">
-                            <input id="local-peer-id" readonly placeholder="Getting your ID…" spellcheck="false">
+                            <input id="local-peer-id" readonly placeholder="Getting your code…" spellcheck="false">
                             <button id="copy-peer-id" type="button" disabled>Copy</button>
                         </div>
                         <form id="connect-form">
                             <label for="remote-peer-id">Connect to a friend</label>
                             <div class="connection-row">
-                                <input id="remote-peer-id" placeholder="Paste their ID" maxlength="128" autocomplete="off" spellcheck="false" required>
+                                <input id="remote-peer-id" placeholder="Enter their 8-character code" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
                                 <button id="connect-peer" type="submit" disabled>Connect</button>
                             </div>
                         </form>
@@ -114,7 +113,7 @@
                             <button id="disconnect-peer" type="button" hidden>Disconnect</button>
                             <button id="retry-peer" type="button" hidden>Retry</button>
                         </div>
-                        <p id="connection-message" role="status" aria-live="polite">Share your ID, or enter a friend's. Keep both pages open.</p>
+                        <p id="connection-message" role="status" aria-live="polite">Open this website on both computers, then share one connection code. Keep both pages open.</p>
                         <p class="connection-note">Parachutes only for now. File sharing is coming later.</p>
                     </div>
                 </details>
