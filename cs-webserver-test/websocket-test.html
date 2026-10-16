@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebSocket Broadcast Test</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, sans-serif;
+    }
+
+    body {
+      max-width: 42rem;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    form {
+      display: flex;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    input, button, textarea {
+      box-sizing: border-box;
+      font: inherit;
+      padding: 0.6rem;
+    }
+
+    input {
+      flex: 1;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 14rem;
+      resize: vertical;
+    }
+
+    #status {
+      font-weight: 700;
+    }
+
+    .connected {
+      color: #16803c;
+    }
+
+    .disconnected {
+      color: #b42318;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Broadcast Test</h1>
+  <p>Status: <span id="status" class="disconnected">Connecting...</span></p>
+
+  <form id="broadcast-form">
+    <input id="message" type="text" placeholder="Type a message" autocomplete="off" required>
+    <button id="broadcast" type="submit" disabled>Broadcast</button>
+  </form>
+
+  <label for="log">Received broadcasts</label>
+  <textarea id="log" readonly></textarea>
+
+  <script>
+    // Pass the API server URL as a query parameter, for example:
+    // websocket-test.html?server=https%3A%2F%2Fyour-service.onrender.com
+    const params = new URLSearchParams(window.location.search);
+    const configuredServer = params.get('server') || 'https://YOUR-RENDER-SERVICE.onrender.com';
+    const websocketUrl = configuredServer.replace(/\/+$/, '').replace(/^http/, 'ws') + '/ws';
+
+    const statusElement = document.querySelector('#status');
+    const messageElement = document.querySelector('#message');
+    const broadcastButton = document.querySelector('#broadcast');
+    const form = document.querySelector('#broadcast-form');
+    const logElement = document.querySelector('#log');
+
+    const socket = new WebSocket(websocketUrl);
+
+    socket.addEventListener('open', () => {
+      statusElement.textContent = 'Connected';
+      statusElement.className = 'connected';
+      broadcastButton.disabled = false;
+      messageElement.focus();
+    });
+
+    socket.addEventListener('message', (event) => {
+      const timestamp = new Date().toLocaleTimeString();
+      logElement.value += `[${timestamp}] ${event.data}\n`;
+      logElement.scrollTop = logElement.scrollHeight;
+    });
+
+    socket.addEventListener('error', () => {
+      statusElement.textContent = 'Connection error';
+      statusElement.className = 'disconnected';
+    });
+
+    socket.addEventListener('close', () => {
+      statusElement.textContent = 'Disconnected';
+      statusElement.className = 'disconnected';
+      broadcastButton.disabled = true;
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const message = messageElement.value.trim();
+      if (!message || socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      socket.send(message);
+      messageElement.value = '';
+      messageElement.focus();
+    });
+  </script>
+</body>
+</html>

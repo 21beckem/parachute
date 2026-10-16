@@ -4,3 +4,4 @@ obj/
 .vs/
 *.user
 *.suo
+websocket-test.html

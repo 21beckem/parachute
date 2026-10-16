@@ -1,5 +1,9 @@
-using Microsoft.AspNetCore.Builder;
+using System.Collections.Concurrent;
+using System.Net.WebSockets;
+using System.Text;
 
+const int maxMessageBytes = 4096;
+var clients = new ConcurrentDictionary<Guid, ClientConnection>();
 var port = GetPort();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +13,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 var app = builder.Build();
+
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromMinutes(2)
+});
 
 var api = app.MapGroup("/api");
 
@@ -24,6 +33,55 @@ api.MapGet("/status", () => Results.Ok(new
     service = "cs-webserver-test"
 }));
 
+app.Map("/ws", async context =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            error = "WebSocket upgrade required."
+        });
+        return;
+    }
+
+    using var socket = await context.WebSockets.AcceptWebSocketAsync();
+    var clientId = Guid.NewGuid();
+    var client = new ClientConnection(socket);
+    clients[clientId] = client;
+
+    try
+    {
+        while (socket.State == WebSocketState.Open)
+        {
+            var message = await ReceiveTextMessageAsync(
+                socket,
+                maxMessageBytes,
+                context.RequestAborted);
+
+            if (message is null)
+            {
+                break;
+            }
+
+            await BroadcastAsync(clientId, message, clients);
+        }
+    }
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+    {
+        // The client disconnected or the request was cancelled.
+    }
+    catch (WebSocketException)
+    {
+        // The client disconnected without completing a normal close handshake.
+    }
+    finally
+    {
+        clients.TryRemove(clientId, out _);
+        await client.CloseAsync();
+    }
+});
+
 app.Run();
 
 static int GetPort()
@@ -36,6 +94,121 @@ static int GetPort()
         : defaultPort;
 }
 
-// The application intentionally does not enable WebSockets yet. When that
-// feature is needed, add the WebSocket middleware and a dedicated route here
-// without changing the existing JSON API endpoints.
+static async Task<string?> ReceiveTextMessageAsync(
+    WebSocket socket,
+    int maxMessageBytes,
+    CancellationToken cancellationToken)
+{
+    var buffer = new byte[1024];
+    using var message = new MemoryStream();
+
+    while (true)
+    {
+        var result = await socket.ReceiveAsync(buffer, cancellationToken);
+
+        if (result.MessageType == WebSocketMessageType.Close)
+        {
+            return null;
+        }
+
+        if (result.MessageType != WebSocketMessageType.Text)
+        {
+            await socket.CloseAsync(
+                WebSocketCloseStatus.InvalidMessageType,
+                "Text messages only.",
+                CancellationToken.None);
+            return null;
+        }
+
+        if (message.Length + result.Count > maxMessageBytes)
+        {
+            await socket.CloseAsync(
+                WebSocketCloseStatus.MessageTooBig,
+                "Messages are limited to 4096 bytes.",
+                CancellationToken.None);
+            return null;
+        }
+
+        message.Write(buffer, 0, result.Count);
+
+        if (result.EndOfMessage)
+        {
+            return Encoding.UTF8.GetString(message.ToArray());
+        }
+    }
+}
+
+static async Task BroadcastAsync(
+    Guid senderId,
+    string message,
+    ConcurrentDictionary<Guid, ClientConnection> clients)
+{
+    var payload = Encoding.UTF8.GetBytes(message);
+    var sends = clients
+        .Where(pair => pair.Key != senderId)
+        .Select(async pair =>
+        {
+            try
+            {
+                await pair.Value.SendAsync(payload);
+            }
+            catch (WebSocketException)
+            {
+                clients.TryRemove(pair.Key, out _);
+            }
+            catch (ObjectDisposedException)
+            {
+                clients.TryRemove(pair.Key, out _);
+            }
+        });
+
+    await Task.WhenAll(sends);
+}
+
+sealed class ClientConnection(WebSocket socket)
+{
+    private readonly SemaphoreSlim sendLock = new(1, 1);
+
+    public async Task SendAsync(byte[] payload)
+    {
+        await sendLock.WaitAsync();
+        try
+        {
+            if (socket.State == WebSocketState.Open)
+            {
+                await socket.SendAsync(
+                    payload,
+                    WebSocketMessageType.Text,
+                    endOfMessage: true,
+                    CancellationToken.None);
+            }
+        }
+        finally
+        {
+            sendLock.Release();
+        }
+    }
+
+    public async Task CloseAsync()
+    {
+        await sendLock.WaitAsync();
+        try
+        {
+            if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+            {
+                await socket.CloseAsync(
+                    WebSocketCloseStatus.NormalClosure,
+                    "Connection closed.",
+                    CancellationToken.None);
+            }
+        }
+        catch (WebSocketException)
+        {
+            // The socket is already gone.
+        }
+        finally
+        {
+            sendLock.Release();
+        }
+    }
+}
