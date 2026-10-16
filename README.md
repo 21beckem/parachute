@@ -46,6 +46,15 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 # AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIIIIIIIEEEEEEE
 (temp text)
 
+## Microphone
+
+Click the microphone button in the bottom-right corner and allow microphone
+access when your browser prompts you. Click it again to release the microphone.
+This currently enables local access only; audio is not recorded or transmitted.
+Microphone access requires HTTPS or `http://localhost:3000`. A plain HTTP
+Same Wi-Fi address can still connect parachutes, but cannot access the microphone;
+use an HTTPS deployment for microphone access on both computers.
+
 ## Connect two computers
 
 Run `node server.cjs` from this folder with Node.js 20 or later. There are no

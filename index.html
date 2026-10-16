@@ -13,6 +13,7 @@
         <link rel="stylesheet" href="style.css">
         <script src="parachute.js" defer></script>
         <script src="connection.js" defer></script>
+        <script src="microphone.js" defer></script>
     </head>
     <body>
         <!-- Reusable artwork for the branding and draggable delivery. -->
@@ -195,5 +196,15 @@
                 <p class="visually-hidden delivery-status" role="status" aria-live="polite"></p>
             </section>
         </main>
+        <aside class="microphone-control" aria-label="Microphone controls">
+            <p id="microphone-status" class="microphone-status" role="status" aria-live="polite" hidden></p>
+            <button id="microphone-toggle" class="microphone-toggle" type="button" aria-label="Turn microphone on" aria-pressed="false" aria-describedby="microphone-status" title="Turn microphone on">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" />
+                </svg>
+                <span id="microphone-label">Mic off</span>
+            </button>
+        </aside>
     </body>
 </html>
