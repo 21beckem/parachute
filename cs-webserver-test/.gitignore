@@ -1,0 +1,32 @@
+## Build outputs
+[Bb]in/
+[Oo]bj/
+[Log]s/
+
+## Visual Studio cache, options, and thread data
+.vs/
+*.suo
+*.user
+*.userprefs
+*.sln.docstates
+
+## Mono Auto Generated Files
+mono_crash.*
+
+## Packed progress files
+*.nupkg
+
+## Rider / JetBrains IDEs
+.idea/
+*.sln.iml
+
+## VS Code settings
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+## OS metadata
+.DS_Store
+Thumbs.db
