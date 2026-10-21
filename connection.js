@@ -47,24 +47,22 @@ class ParachuteConnection {
         return Array.from(crypto.getRandomValues(new Uint8Array(8)), n => alphabet[n % 32]).join('');
     }
 
-    start(room = null) {
+    start() {
         this.destroy();
         const generation = this.generation;
-        this.room = room || this.randomCode();
         this.local.value = '';
-        this.connecting = !!room;
+        this.connecting = false;
         if (room) window.animation.startConnecting();
         this.render('Connecting…', room ? 'Joining the shared room…' : 'Creating your room…');
         try {
             // Keep PeerJS's default STUN/TURN config, unless deployment supplies its own.
-            const peer = new Peer(room ? undefined : `parachute-room-${this.room}`, {
-                ...window.PARACHUTE_PEER_OPTIONS, secure: true
-            });
+            const peer = new Peer();
             this.peer = peer;
             this.timer = setTimeout(() => {
                 if (generation === this.generation) this.fail('Connection timed out. Retry or check your internet connection and TURN configuration.');
             }, 25000);
             peer.on('open', () => {
+                console.log('PeerJS open', peer.id);
                 if (generation !== this.generation) return;
                 this.ready = true;
                 this.local.value = this.room.match(/.{4}/g).join('-');

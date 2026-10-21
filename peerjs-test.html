@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeerJS Test</title>
+</head>
+<body>
+    <input type="text" id="peer-id" placeholder="Enter peer ID to connect">
+    <button id="connect-btn">Connect</button>
+
+    
+    <script src="vendor/peerjs.min.js"></script>
+    <script>
+const connectBtn = document.getElementById('connect-btn');
+const peerIdInput = document.getElementById('peer-id');
+
+connectBtn.addEventListener('click', () => {
+    const peerId = peerIdInput.value.trim();
+    if (peerId) {
+        const conn = peer.connect(peerId);
+        conn.on('open', () => onConnection(conn));
+    } else {
+        console.error('Please enter a valid peer ID.');
+    }
+});
+
+let otherPeer = null;
+const peer = new Peer();
+peer.on('open', (id) => {
+    console.log(id);
+});
+peer.on('error', (err) => {
+    console.error('PeerJS error', err);
+});
+peer.on('connection', (conn) => {
+    conn.on('open', () => onConnection(conn));
+});
+
+function onConnection(conn) {
+    console.log('Incoming connection from', conn.peer);
+    otherPeer = conn;
+    conn.on('data', (data) => {
+        console.log('Received data from peer:', data);
+    });
+}
+    </script>
+</body>
+</html>
