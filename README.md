@@ -17,12 +17,12 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 ## Architecture
 
 * [ ] Web tech(html/css/js)
-* [x] Shared Node.js relay with connection codes
+* [x] PeerJS / WebRTC with shared room codes
 
 ## Software Features
 
 * [ ] File share
-* [x] Two-computer connections (parachute animation messages)
+* [x] Two-way rocket packages and parachutes with receipt confirmations
 * [ ] Keep going ....
 
 ## Team Communication
@@ -57,48 +57,76 @@ use an HTTPS deployment for microphone access on both computers.
 
 ## Connect two computers
 
-Run `node server.cjs` from this folder with Node.js 20 or later. There are no
-dependencies to install. `npm start` also works if npm is installed.
-The server serves both the website and the shared connection service.
+Run `npm start` (Node.js 20+) and open `http://localhost:3000`.
+For computers on different networks, serve this folder on a public HTTPS site
+and open it on both computers. Static hosting works too: PeerJS Cloud provides
+signaling, and packages use a reliable WebRTC data channel. Each computer can
+also run its own local server; they do not need to share a Node server.
 
-For two computers on the **same Wi-Fi**, open the **Same Wi-Fi** URL printed
-in the terminal on both computers (for example `http://192.168.1.25:3000`).
-Keep the server running. If Windows asks, allow Node on your private network.
-The other computer must use this network address; its own `localhost` points
-to itself. Guest Wi-Fi may isolate devices; use a network that allows them
-to reach the computer running the server.
+1. Open the connection badge at the top right on computer A.
+2. Copy its **Shared room code**, such as `ABCD-2345`, and share it with B.
+3. On B, open the badge, enter A's code under **Join a friend's room**, and
+   click **Join room**. Both pages now show the same room code and **Connected**.
+   Only B enters the code; A keeps its page open as the room creator.
+4. Choose **Package artwork** and click **Drop parachute ↑** on either computer.
+   Its rocket launches, and a matching parachute appears on the other computer.
+5. Packages are received automatically. The recipient shows a receipt message;
+   the sender shows **delivered** only after the recipient acknowledges it.
+   Dragging the parachute into the box is an optional animation after receipt.
+6. **Disconnect** creates a fresh room. **Retry** recovers from a connection
+   failure with a fresh room code. Share the new code to reconnect.
 
-For computers on **different networks**, deploy this folder to a Node-capable
-host with start command `node server.cjs`, and open the same public HTTPS URL
-on both computers. The server honors the host's `PORT` environment variable.
-Use one running server instance; connection codes live in its memory and reset
-when it restarts. If using a reverse proxy, preserve the public Host header,
-disable buffering for `/api/events`, and allow long-running event streams.
-Static-only hosting (including GitHub Pages), opening `index.html` directly,
-or running separate servers on each computer does not provide a shared relay.
+Rooms hold two computers. A third visitor cannot replace the connected friend.
+Room codes are temporary; keep both pages open. The dropdown closes when clicking
+outside it or pressing Escape.
 
-1. Click the connection badge at the top right to open its dropdown.
-2. Copy your code (such as `ABCD-2345`) and share it with the other person.
-3. On the other computer, enter that code under **Connect to a friend** and
-   click **Connect**. Only one person needs to enter a code.
-4. Once both badges say **Connected**, click **Drop parachute ↑** on either
-   page. The rocket launches locally and a parachute arrives on the other page.
-5. Use **Disconnect** to unpair, or **Retry** after losing the server connection.
-   Refreshing or retrying creates a new code. Keep both pages open.
+This milestone sends the app's rocket launch action and parachute artwork type,
+with an empty payload array. The folder option selects existing folder artwork;
+no file bytes, directory contents, links, or actual folders are transferred.
+Example packet (the real ID is a random UUID):
 
-The dropdown starts closed; clicking outside it or pressing Escape closes it.
-Only one friend connects at a time. File sharing is not implemented. Only the
-animation command `{ type: 'parachute', version: 1 }` reaches the recipient.
-The relay rejects file payloads and extra fields, and routes messages only
-between the paired sessions. It uses HTTP POST and server-sent events so the
-two browsers do not need a direct WebRTC connection or a TURN service.
-Anyone you share your code with can connect while it is available.
+```json
+{
+  "type": "package",
+  "version": 1,
+  "id": "unique-package-id",
+  "rocket": { "action": "launch" },
+  "parachute": { "kind": "picture", "payload": [] }
+}
+```
 
-Run all animation, connection-controller, and real HTTP relay checks with
-`node --test tests/*.test.cjs` (or `npm test`). The relay tests open independent
-client streams and verify pairing, delivery in both directions, disconnects,
-invalid requests, and reconnecting. Two physical computers must still be
-checked using the shared URL in your network or deployment.
+Receipts contain only `{ "type": "receipt", "version": 1, "id": "unique-package-id" }`.
+Malformed packages and nonempty payloads are rejected. Duplicate package IDs
+are acknowledged without creating another parachute. Sending waits for receipt,
+with a ten-second timeout that reports delivery as unconfirmed. Up to 20
+parachutes can be on screen at once; a full sky does not acknowledge another
+package. A disconnect during rocket launch cancels that transfer.
+
+PeerJS uses its bundled default STUN/TURN services, including TURN relays for
+networks that block direct peer connections. Public signaling and relay
+availability are external dependencies. For deployment-specific signaling or
+TURN credentials, set `window.PARACHUTE_PEER_OPTIONS` in a script before
+`connection.js` loads. Supply PeerJS options, including `config.iceServers`;
+obtain short-lived TURN credentials from your own service for a production app.
+A restrictive network may still block these services; the interface reports
+connection failures instead of claiming success.
+
+Verification: separate Edge browser contexts connected through PeerJS Cloud,
+exchanged picture and music packages in both directions, confirmed receipt,
+and detected disconnects. Forcing PeerJS's bundled public TURN servers timed
+out in the test environment. Cross-network connectivity through a relay is
+therefore unverified and needs a working TURN service before it can be relied
+on for restrictive networks.
+
+The older `/api/*` HTTP relay remains available for compatibility, but the app's
+connection controller does not use it.
+
+Run `npm test` for controller, animation, microphone, and HTTP server checks.
+For a real two-browser test, install Playwright (`npm install --no-save playwright`)
+and Microsoft Edge, then run `node tests/peerjs-browser.cjs`. Set
+`PARACHUTE_TEST_RELAY=1` to force TURN and test the relay path. This checks separate
+browser contexts on one machine; physical computers on different networks
+should also be tested using the steps above.
 
 ## Animation API
 

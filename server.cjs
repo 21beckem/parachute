@@ -10,7 +10,8 @@ const assets = new Map([
     ['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']],
     ['/style.css', ['style.css', 'text/css']], ['/background.css', ['background.css', 'text/css']],
     ['/parachute.js', ['parachute.js', 'text/javascript']], ['/connection.js', ['connection.js', 'text/javascript']],
-    ['/microphone.js', ['microphone.js', 'text/javascript']]
+    ['/microphone.js', ['microphone.js', 'text/javascript']],
+    ['/vendor/peerjs.min.js', ['vendor/peerjs.min.js', 'text/javascript']]
 ]);
 
 function createParachuteServer() {

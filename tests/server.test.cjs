@@ -88,7 +88,10 @@ test('invalid codes, busy friends, unauthorized requests and file payloads are r
     assert.equal((await fetch(`${url}/server.cjs`)).status, 404);
     const html = await (await fetch(url)).text();
     assert.match(html, /<details class="connection-panel">/);
-    assert.doesNotMatch(html, /peerjs.min.js/);
+    assert.match(html, /vendor\/peerjs.min.js/);
+    const peerjs = await fetch(`${url}/vendor/peerjs.min.js`);
+    assert.equal(peerjs.status, 200);
+    assert.match(peerjs.headers.get('content-type'), /javascript/);
 });
 
 test('simultaneous joins keep a single pair and closing a stream releases the friend', { timeout: 10000 }, async t => {

@@ -196,6 +196,12 @@ a {
     border-radius: 8px;
     font: 13px ui-monospace, monospace;
 }
+.connection-card select {
+    width: 100%; padding: 8px; margin-bottom: 8px;
+    border: 1px solid #8ba5b6; border-radius: 8px;
+    background: white; color: var(--ink); font: inherit;
+}
+.connection-card label[for='package-kind'] { margin-top: 12px; }
 .connection-card button {
     border: 1px solid var(--ink);
     border-radius: 8px;
