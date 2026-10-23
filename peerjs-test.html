@@ -19,6 +19,7 @@ connectBtn.addEventListener('click', () => {
     const peerId = peerIdInput.value.trim();
     if (peerId) {
         const conn = peer.connect(peerId);
+        conn.on('error', (err) => console.error('Connection error', err));
         conn.on('open', () => onConnection(conn));
     } else {
         console.error('Please enter a valid peer ID.');
@@ -26,7 +27,7 @@ connectBtn.addEventListener('click', () => {
 });
 
 let otherPeer = null;
-const peer = new Peer();
+const peer = new Peer({ debug: 2 });
 peer.on('open', (id) => {
     console.log(id);
 });
@@ -34,15 +35,17 @@ peer.on('error', (err) => {
     console.error('PeerJS error', err);
 });
 peer.on('connection', (conn) => {
+    conn.on('error', (err) => console.error('Connection error', err));
     conn.on('open', () => onConnection(conn));
 });
 
 function onConnection(conn) {
-    console.log('Incoming connection from', conn.peer);
+    console.log('Connected to', conn.peer);
     otherPeer = conn;
     conn.on('data', (data) => {
         console.log('Received data from peer:', data);
     });
+    conn.send('Hello from the other computer!');
 }
     </script>
 </body>
