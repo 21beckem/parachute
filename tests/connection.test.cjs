@@ -15,7 +15,7 @@ function setup() {
         close() { if (this.closed) return; this.closed = true; this.open = false; this.emit('close'); this.other?.close(); }
     }
     class Peer extends EventEmitter {
-        constructor(id) { super(); this.id = id || webcrypto.randomUUID(); peers.set(this.id, this); setImmediate(() => { if (!this.destroyed) this.emit('open', this.id); }); }
+        constructor(options) { super(); assert.equal(options.debug, 2); this.id = `Page-${webcrypto.randomUUID()}`; peers.set(this.id, this); setImmediate(() => { if (!this.destroyed) this.emit('open', this.id); }); }
         connect(id, options) {
             const a = new Channel(id, options), target = peers.get(id);
             if (!target) { setImmediate(() => this.emit('error', { type: 'peer-unavailable' })); return a; }
@@ -37,7 +37,7 @@ function setup() {
         const window = { addEventListener() {}, ParachuteAnimation: { deliveries: new Set() }, animation: {
             startConnecting() {}, stopConnecting() {}, launchRocket: async () => true,
             dropParachute: (payload, kind) => drops.push({ payload, kind }) } };
-        vm.runInNewContext(source, { window, document, navigator: {}, Peer, crypto: webcrypto, setTimeout, clearTimeout });
+        vm.runInNewContext(source, { window, document, navigator: {}, Peer, crypto: webcrypto, setTimeout, clearTimeout, console: { error() {} } });
         const result = { c: window.parachuteConnection, window, panel, listeners, drops };
         clients.push(result); return result;
     }
@@ -46,14 +46,16 @@ function setup() {
 async function pair(t) {
     const s = setup(); t.after(s.close);
     const a = s.client(), b = s.client(); await tick();
-    b.c.remote.value = a.c.local.value.toLowerCase(); b.c.connectToPeer();
+    b.c.remote.value = ` ${a.c.local.value} `; b.c.connectToPeer();
     await tick(); await tick();
     assert.equal(a.c.state.textContent, 'Connected'); assert.equal(b.c.state.textContent, 'Connected');
-    assert.equal(a.c.local.value, b.c.local.value);
+    assert.notEqual(a.c.local.value, b.c.local.value);
+    assert.equal(a.c.remote.value, b.c.local.value);
+    assert.equal(b.c.remote.value, a.c.local.value);
     return { ...s, a, b };
 }
 
-test('shared room connects and sends acknowledged packages in both directions', async t => {
+test('page IDs connect directly and send acknowledged packages in both directions', async t => {
     const { a, b } = await pair(t);
     for (const kind of ['other', 'file', 'folder', 'music', 'link', 'picture', 'video']) {
         await a.c.sendParachute(kind); await tick(); await tick();
@@ -78,18 +80,24 @@ test('invalid payloads, files, unknown receipts and sky overflow are rejected', 
     assert.equal(b.drops.length, 0);
     b.window.ParachuteAnimation.deliveries = new Set(Array.from({ length: 20 }, (_, i) => i));
     b.c.receive(packet); assert.equal(b.drops.length, 0); assert.equal(b.c.channel.sent.length, 0);
-    a.c.start(); assert.equal(b.c.ready, false); assert.equal(b.c.send.disabled, true);
+    const id = a.c.local.value;
+    a.c.closeConnection(); assert.equal(a.c.local.value, id);
+    assert.equal(b.c.ready, true); assert.equal(b.c.send.disabled, true);
 });
 
-test('invalid, self, missing and full rooms are handled; dropdown closes', async t => {
+test('invalid, self, missing and busy peers are handled; dropdown closes', async t => {
     const { a, b, client } = await pair(t);
     const c = client(); await tick();
     for (const code of ['bad/id', c.c.local.value]) { c.c.remote.value = code; c.c.connectToPeer(); assert.equal(c.c.ready, true); }
     c.c.remote.value = a.c.local.value; c.c.connectToPeer(); await tick(); await tick();
     assert.equal(a.c.state.textContent, 'Connected'); assert.equal(b.c.state.textContent, 'Connected');
     assert.equal(c.c.send.disabled, true);
-    c.c.start(); await tick(); c.c.remote.value = 'ZZZZ-2222'; c.c.connectToPeer(); await tick(); await tick();
-    assert.match(c.c.message.textContent, /Room not found/);
+    c.c.start(); await tick();
+    const id = c.c.local.value;
+    c.c.remote.value = 'missing-peer'; c.c.connectToPeer(); await tick(); await tick();
+    assert.match(c.c.message.textContent, /Peer not found/);
+    assert.equal(c.c.local.value, id);
+    assert.equal(c.c.connect.disabled, false);
     a.panel.open = true; a.listeners.click({ target: {} }); assert.equal(a.panel.open, false);
     a.panel.open = true; a.listeners.keydown({ key: 'Escape' }); assert.equal(a.panel.open, false);
 });
@@ -101,4 +109,37 @@ test('disconnect or reconnect during launch never sends a stale package', async 
     a.c.start(); finish(true); await flight;
     assert.equal(channel.sent.length, 0); assert.equal(b.drops.length, 0);
     await tick(); assert.equal(a.c.send.disabled, true);
+});
+
+test('both people clicking Connect converge on one connection', async t => {
+    const s = setup(); t.after(s.close);
+    const a = s.client(), b = s.client(); await tick();
+    a.c.remote.value = b.c.local.value;
+    b.c.remote.value = a.c.local.value;
+    a.c.connectToPeer(); b.c.connectToPeer();
+    await tick(); await tick();
+    assert.equal(a.c.channel?.open, true);
+    assert.equal(b.c.channel?.open, true);
+    assert.equal(a.c.channel.other, b.c.channel);
+    await a.c.sendParachute('other'); await tick(); await tick();
+    assert.equal(b.drops.length, 1);
+    assert.match(a.c.message.textContent, /confirmed receipt/);
+});
+
+test('case-sensitive IDs are kept intact; old peer events do not affect a retry', async t => {
+    const s = setup(); t.after(s.close);
+    const a = s.client(), b = s.client(); await tick();
+    const oldPeer = a.c.peer;
+    a.c.remote.value = b.c.local.value.toLowerCase();
+    a.c.connectToPeer(); await tick(); await tick();
+    assert.match(a.c.message.textContent, /Peer not found/);
+    a.c.start(); await tick();
+    const id = a.c.local.value;
+    oldPeer.emit('disconnected');
+    oldPeer.emit('error', { type: 'network' });
+    assert.equal(a.c.ready, true);
+    assert.equal(a.c.local.value, id);
+    a.c.remote.value = b.c.local.value;
+    a.c.connectToPeer(); await tick(); await tick();
+    assert.equal(a.c.state.textContent, 'Connected');
 });

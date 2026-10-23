@@ -99,30 +99,30 @@
                 <details class="connection-panel">
                     <summary class="status"><span class="status-dot"></span><span id="connection-state">Connecting…</span></summary>
                     <div class="connection-card">
-                        <label for="local-peer-id">Shared room code</label>
+                        <label for="local-peer-id">Your page ID</label>
                         <div class="connection-row">
-                            <input id="local-peer-id" readonly placeholder="Getting your code…" spellcheck="false">
+                            <input id="local-peer-id" readonly placeholder="Getting your page ID…" spellcheck="false">
                             <button id="copy-peer-id" type="button" disabled>Copy</button>
                         </div>
                         <form id="connect-form">
-                            <label for="remote-peer-id">Join a friend’s room</label>
+                            <label for="remote-peer-id">Your friend’s page ID</label>
                             <div class="connection-row">
-                                <input id="remote-peer-id" placeholder="Enter their 8-character code" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
-                                <button id="connect-peer" type="submit" disabled>Join room</button>
+                                <input id="remote-peer-id" placeholder="Paste their complete PeerJS ID" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+                                <button id="connect-peer" type="submit" disabled>Connect</button>
                             </div>
                         </form>
                         <div class="connection-actions">
                             <button id="disconnect-peer" type="button" hidden>Disconnect</button>
                             <button id="retry-peer" type="button" hidden>Retry</button>
                         </div>
-                        <p id="connection-message" role="status" aria-live="polite">Open this website on both computers, then share one connection code. Keep both pages open.</p>
+                        <p id="connection-message" role="status" aria-live="polite">Open this website on both computers, then copy one page’s ID into the other page. Keep both pages open.</p>
                         <label for="package-kind">Package artwork</label>
                         <select id="package-kind">
                             <option value="other">Parcel</option><option value="file">Document</option>
                             <option value="folder">Folder icon</option><option value="music">Music</option>
                             <option value="link">Link</option><option value="picture">Picture</option><option value="video">Video</option>
                         </select>
-                        <p class="connection-note">Two people per room. Rockets carry animation packages; files and folders aren’t transferred yet.</p>
+                        <p class="connection-note">One friend at a time. This ID belongs to this page, not your computer. Refreshing creates a new ID. Files and folders aren’t transferred yet.</p>
                     </div>
                 </details>
             </div>

@@ -17,7 +17,7 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 ## Architecture
 
 * [ ] Web tech(html/css/js)
-* [x] PeerJS / WebRTC with shared room codes
+* [x] PeerJS / WebRTC with individual page IDs
 
 ## Software Features
 
@@ -64,21 +64,29 @@ signaling, and packages use a reliable WebRTC data channel. Each computer can
 also run its own local server; they do not need to share a Node server.
 
 1. Open the connection badge at the top right on computer A.
-2. Copy its **Shared room code**, such as `ABCD-2345`, and share it with B.
-3. On B, open the badge, enter A's code under **Join a friend's room**, and
-   click **Join room**. Both pages now show the same room code and **Connected**.
-   Only B enters the code; A keeps its page open as the room creator.
-4. Choose **Package artwork** and click **Drop parachute ↑** on either computer.
+2. Copy **Your page ID** and share the complete ID with B.
+3. On B, open the badge, paste A's ID under **Your friend's page ID**, and
+   click **Connect**. Only one person needs to initiate the connection.
+4. Both badges show **Connected** once the actual data channel opens. Each page
+   keeps its own ID, and the other person's ID appears in the friend's ID field.
+5. Choose **Package artwork** and click **Drop parachute ↑** on either computer.
    Its rocket launches, and a matching parachute appears on the other computer.
-5. Packages are received automatically. The recipient shows a receipt message;
-   the sender shows **delivered** only after the recipient acknowledges it.
-   Dragging the parachute into the box is an optional animation after receipt.
-6. **Disconnect** creates a fresh room. **Retry** recovers from a connection
-   failure with a fresh room code. Share the new code to reconnect.
+   Receipt is automatic; **delivered** means the other browser acknowledged it.
+6. **Disconnect** unpairs the pages and keeps their IDs available for reconnecting.
+   **Retry** restarts PeerJS after a service failure and generates a new ID.
 
-Rooms hold two computers. A third visitor cannot replace the connected friend.
-Room codes are temporary; keep both pages open. The dropdown closes when clicking
-outside it or pressing Escape.
+The connection core matches `peerjs-test.html`: `new Peer({ debug: 2 })`,
+`peer.on('open', id => ...)`, `peer.connect(otherId)`, and
+`peer.on('connection', conn => ...)`. There are no rooms or connection codes,
+and no custom metadata is required to connect. The simple test page and the
+main page can establish a data connection with each other; only the main app
+understands rocket/parachute packages.
+
+IDs identify a browser page session, not a physical computer or hardware ID.
+Refreshing creates a new ID. Copy the full ID exactly, including capitalization
+and hyphens. Keep both pages open. Only one friend connects at a time; another
+incoming connection cannot replace an existing friend. Clicking outside the
+dropdown or pressing Escape closes it.
 
 This milestone sends the app's rocket launch action and parachute artwork type,
 with an empty payload array. The folder option selects existing folder artwork;
@@ -102,31 +110,23 @@ with a ten-second timeout that reports delivery as unconfirmed. Up to 20
 parachutes can be on screen at once; a full sky does not acknowledge another
 package. A disconnect during rocket launch cancels that transfer.
 
-PeerJS uses its bundled default STUN/TURN services, including TURN relays for
-networks that block direct peer connections. Public signaling and relay
-availability are external dependencies. For deployment-specific signaling or
-TURN credentials, set `window.PARACHUTE_PEER_OPTIONS` in a script before
-`connection.js` loads. Supply PeerJS options, including `config.iceServers`;
-obtain short-lived TURN credentials from your own service for a production app.
-A restrictive network may still block these services; the interface reports
-connection failures instead of claiming success.
+The app uses the same default PeerJS network settings as `peerjs-test.html`.
+PeerJS Cloud handles signaling; the Node server only serves static files.
+The old HTTP relay and its `/api/*` connection endpoints have been removed.
 
-Verification: separate Edge browser contexts connected through PeerJS Cloud,
-exchanged picture and music packages in both directions, confirmed receipt,
-and detected disconnects. Forcing PeerJS's bundled public TURN servers timed
-out in the test environment. Cross-network connectivity through a relay is
-therefore unverified and needs a working TURN service before it can be relied
-on for restrictive networks.
+Direct connections can be blocked by school Wi-Fi, NAT, or a firewall. Our
+previous diagnostics found that the bundled default TURN hosts were not
+resolving. This change does not add a working TURN service or bypass network
+restrictions. For reliable use on restrictive networks, working TURN
+configuration is a separate requirement.
 
-The older `/api/*` HTTP relay remains available for compatibility, but the app's
-connection controller does not use it.
-
-Run `npm test` for controller, animation, microphone, and HTTP server checks.
+Run `npm test` for controller, animation, microphone, and static server checks.
 For a real two-browser test, install Playwright (`npm install --no-save playwright`)
-and Microsoft Edge, then run `node tests/peerjs-browser.cjs`. Set
-`PARACHUTE_TEST_RELAY=1` to force TURN and test the relay path. This checks separate
-browser contexts on one machine; physical computers on different networks
-should also be tested using the steps above.
+and Microsoft Edge, then run `node tests/peerjs-browser.cjs`. This verifies
+page-ID connections, packages and acknowledgments in both directions,
+disconnecting without changing IDs, reconnecting, and compatibility with the
+unmodified simple test page. It uses separate browser contexts on one machine;
+two physical computers still need a test on the intended network.
 
 ## Animation API
 

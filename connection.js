@@ -1,4 +1,4 @@
-// Room codes map to PeerJS host IDs; packages travel over reliable WebRTC data channels.
+// Same core as peerjs-test.html: Peer assigns an ID, then peer.connect(otherId).
 class ParachuteConnection {
     constructor() {
         this.generation = 0;
@@ -12,7 +12,7 @@ class ParachuteConnection {
         })) this[key] = document.getElementById(id);
         this.panel = this.state.closest('.connection-panel');
         this.form.addEventListener('submit', event => { event.preventDefault(); this.connectToPeer(); });
-        this.disconnect.addEventListener('click', () => this.start());
+        this.disconnect.addEventListener('click', () => this.closeConnection());
         this.retry.addEventListener('click', () => this.start());
         this.copy.addEventListener('click', () => this.copyId());
         this.send.addEventListener('click', () => this.sendParachute());
@@ -42,43 +42,32 @@ class ParachuteConnection {
         this.send.disabled = !this.channel?.open || this.sending || this.pending.size > 0;
     }
 
-    randomCode() {
-        const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        return Array.from(crypto.getRandomValues(new Uint8Array(8)), n => alphabet[n % 32]).join('');
-    }
-
     start() {
         this.destroy();
         const generation = this.generation;
         this.local.value = '';
         this.connecting = false;
-        if (room) window.animation.startConnecting();
-        this.render('Connecting…', room ? 'Joining the shared room…' : 'Creating your room…');
+        this.render('Connecting…', 'Getting this page’s PeerJS ID…');
         try {
-            // Keep PeerJS's default STUN/TURN config, unless deployment supplies its own.
-            const peer = new Peer();
+            const peer = new Peer({ debug: 2 });
             this.peer = peer;
             this.timer = setTimeout(() => {
                 if (generation === this.generation) this.fail('Connection timed out. Retry or check your internet connection and TURN configuration.');
             }, 25000);
-            peer.on('open', () => {
-                console.log('PeerJS open', peer.id);
+            peer.on('open', id => {
                 if (generation !== this.generation) return;
                 this.ready = true;
-                this.local.value = this.room.match(/.{4}/g).join('-');
-                if (room) {
-                    this.attach(peer.connect(`parachute-room-${room}`, {
-                        reliable: true, serialization: 'json', label: 'parachute-v1',
-                        metadata: { version: 1, room }
-                    }), generation);
-                } else {
-                    clearTimeout(this.timer);
-                    this.render('Room ready', 'Share this room code. Your friend enters it under Join a friend’s room.');
-                }
+                this.local.value = id;
+                clearTimeout(this.timer);
+                this.render('Ready to connect', 'Share your page ID, or paste your friend’s ID and click Connect.');
             });
             peer.on('connection', channel => {
-                if (generation !== this.generation || room || this.channel ||
-                    channel.label !== 'parachute-v1' || channel.metadata?.version !== 1 || channel.metadata?.room !== this.room) {
+                // If both people click Connect, keep the connection initiated by the lower ID.
+                if (generation === this.generation && this.connecting &&
+                    this.channel?.peer === channel.peer && this.peer.id > channel.peer) {
+                    this.closeConnection();
+                }
+                if (generation !== this.generation || this.channel) {
                     channel.on('open', () => channel.close());
                     channel.close();
                     return;
@@ -87,13 +76,13 @@ class ParachuteConnection {
             });
             peer.on('error', error => {
                 if (generation !== this.generation) return;
-                if (error.type === 'unavailable-id' && !room) return this.start();
-                this.fail(error.type === 'peer-unavailable'
-                    ? 'Room not found. Check the code and keep the room creator’s page open.'
-                    : `PeerJS connection failed (${error.type || 'network'}). Click Retry.`);
+                console.error('PeerJS error', error);
+                if (error.type === 'peer-unavailable') {
+                    this.closeConnection('Peer not found. Check their current page ID and keep both pages open.');
+                } else this.fail(`PeerJS connection failed (${error.type || 'network'}). Click Retry.`);
             });
             peer.on('disconnected', () => {
-                if (generation === this.generation) this.fail('Signaling connection lost. Click Retry and share the new room code.');
+                if (generation === this.generation) this.fail('Signaling connection lost. Click Retry and share your new page ID.');
             });
         } catch {
             this.fail('PeerJS could not start. Check your internet connection and browser support, then Retry.');
@@ -107,35 +96,57 @@ class ParachuteConnection {
         const current = () => generation === this.generation && this.channel === channel;
         clearTimeout(this.timer);
         this.timer = setTimeout(() => {
-            if (current()) this.fail('The peer could not connect. Check the room code, firewall, or TURN service, then Retry.');
+            if (current()) this.closeConnection('Connection timed out. Check their page ID. Your network may block direct connections.');
         }, 25000);
         channel.on('open', () => {
             if (!current()) return channel.close();
             clearTimeout(this.timer);
             this.connecting = false;
             window.animation.stopConnecting();
-            this.render('Connected', 'Both computers are connected. Launch a rocket to send a package.');
+            this.remote.value = channel.peer;
+            this.render('Connected', 'Both pages are connected. Launch a rocket to send a package.');
         });
         channel.on('data', data => {
             if (current() && channel.open) this.receive(data);
         });
         channel.on('close', () => {
-            if (current()) this.fail('Your friend disconnected. Click Retry to create a new room.');
+            if (current()) this.closeConnection('Your friend disconnected. Paste their current page ID to connect again.');
         });
-        channel.on('error', () => {
-            if (current()) this.fail('The data connection failed. Click Retry to create a new room.');
+        channel.on('error', error => {
+            console.error('Connection error', error);
+            if (current()) this.closeConnection('The data connection failed. Check the ID and network, then Connect again.');
         });
         this.render('Connecting…', 'Opening the peer data connection…');
     }
 
     connectToPeer() {
         if (!this.ready || this.channel || this.connecting) return;
-        const code = this.remote.value.toUpperCase().replace(/[\s-]/g, '');
-        if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
-            this.message.textContent = 'Enter an 8-character room code.';
-        } else if (code === this.room) {
-            this.message.textContent = 'You are already hosting this room. Share its code with your friend.';
-        } else this.start(code);
+        const id = this.remote.value.trim();
+        if (!/^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/.test(id)) {
+            this.message.textContent = 'Paste your friend’s complete PeerJS page ID.';
+        } else if (id === this.peer.id) {
+            this.message.textContent = 'That is your page ID. Enter the ID from the other page.';
+        } else {
+            try { this.attach(this.peer.connect(id), this.generation); }
+            catch (error) {
+                console.error('Connection error', error);
+                this.closeConnection('Could not connect. Check their page ID and try again.');
+            }
+        }
+    }
+
+    closeConnection(message = 'Disconnected. Your page ID is unchanged; connect whenever you’re ready.') {
+        clearTimeout(this.timer);
+        for (const { timer } of this.pending.values()) clearTimeout(timer);
+        this.pending.clear();
+        this.received.clear();
+        const channel = this.channel;
+        this.channel = null;
+        this.connecting = false;
+        this.sending = false;
+        channel?.close();
+        window.animation.stopConnecting();
+        this.render('Ready to connect', message);
     }
 
     receive(data) {
@@ -190,7 +201,7 @@ class ParachuteConnection {
         } catch {
             if (generation === this.generation) this.fail('The package could not be sent. Click Retry.');
         } finally {
-            if (generation === this.generation) {
+            if (generation === this.generation && this.channel === channel) {
                 this.sending = false;
                 this.send.disabled = !this.channel?.open || this.pending.size > 0;
             }
@@ -201,10 +212,10 @@ class ParachuteConnection {
         if (!this.ready || !this.local.value) return;
         try {
             await navigator.clipboard.writeText(this.local.value);
-            this.message.textContent = 'Room code copied. Share it with your friend.';
+            this.message.textContent = 'Page ID copied. Share it with your friend.';
         } catch {
             this.local.focus(); this.local.select();
-            this.message.textContent = 'Room code selected. Copy it and share it with your friend.';
+            this.message.textContent = 'Page ID selected. Copy it and share it with your friend.';
         }
     }
 
