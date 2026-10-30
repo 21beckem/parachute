@@ -6,11 +6,67 @@
 /* Sky and moving clouds */
 .scenery {
     position: absolute;
-    inset: 0;
+    inset: 0 0 auto;
+    height: 200%;
     overflow: hidden;
     z-index: -1;
-    background: linear-gradient(#478ff0 0%, #8dd3f8 63%, #d2eebc 85%);
+    background: linear-gradient(
+        #3268ad 0%,
+        #518fea 30%,
+        #478ff0 50%,
+        #8dd3f8 81.5%,
+        #d2eebc 92.5%
+    );
+    transform: translateY(-50%);
     pointer-events: none;
+}
+
+.lower-sky {
+    position: absolute;
+    inset: 50% 0 0;
+}
+.high-sun {
+    position: absolute;
+    top: 7%;
+    right: 14%;
+    width: clamp(62px, 8vw, 108px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #fff0b3;
+    box-shadow:
+        0 0 0 18px #fff0b312,
+        0 0 70px 30px #fff0b322;
+}
+.high-cloud-one {
+    top: 14%;
+    --cloud-duration: 115s;
+    --cloud-delay: -18s;
+    --cloud-still-left: 8%;
+    transform: scale(0.8);
+    opacity: 0.7;
+}
+.high-cloud-two {
+    top: 34%;
+    --cloud-duration: 135s;
+    --cloud-delay: -85s;
+    --cloud-still-left: 76%;
+    transform: scale(1.1);
+    opacity: 0.28;
+}
+.high-cloud-three {
+    top: 46%;
+    --cloud-duration: 105s;
+    --cloud-delay: -40s;
+    --cloud-still-left: 40%;
+    transform: scale(0.6);
+    opacity: 0.6;
+}
+
+.has-entered .scenery {
+    transition: transform 1.8s cubic-bezier(0.65, 0, 0.25, 1);
+}
+.welcome-active:not(.has-entered) .scenery {
+    transform: translateY(0);
 }
 
 .cloud {
@@ -98,7 +154,18 @@
     width: 65%;
     height: 24%;
     background: #6c9dc6;
-    clip-path: polygon(0 95%, 12% 65%, 20% 76%, 39% 28%, 48% 43%, 57% 35%, 71% 65%, 85% 18%, 100% 55%, 100% 100%);
+    clip-path: polygon(
+        0 95%,
+        12% 65%,
+        20% 76%,
+        39% 28%,
+        48% 43%,
+        57% 35%,
+        71% 65%,
+        85% 18%,
+        100% 55%,
+        100% 100%
+    );
 }
 
 .hill {
@@ -130,9 +197,15 @@
     inset: 73% 0 10%;
     transform: rotate(-3deg);
     opacity: 0.7;
-    background-image: radial-gradient(ellipse, #ffec9a 0 2px, transparent 3px), radial-gradient(ellipse, #ffffed 0 2px, transparent 3px);
-    background-size: 79px 37px, 113px 51px;
-    background-position: 8px 0, 31px 20px;
+    background-image:
+        radial-gradient(ellipse, #ffec9a 0 2px, transparent 3px),
+        radial-gradient(ellipse, #ffffed 0 2px, transparent 3px);
+    background-size:
+        79px 37px,
+        113px 51px;
+    background-position:
+        8px 0,
+        31px 20px;
 }
 
 /* Desk */
@@ -140,7 +213,14 @@
     position: absolute;
     z-index: -1;
     inset: 57px 0 0;
-    background: repeating-linear-gradient(3deg, transparent 0 25px, #92533015 26px 30px, transparent 31px 44px), linear-gradient(#f6d69e 0 57%, #b7774b 58%);
+    background:
+        repeating-linear-gradient(
+            3deg,
+            transparent 0 25px,
+            #92533015 26px 30px,
+            transparent 31px 44px
+        ),
+        linear-gradient(#f6d69e 0 57%, #b7774b 58%);
     border-top: 5px solid #826044;
     border-bottom: 8px solid #8e593c;
     border-radius: 50% 50% 0 0 / 30% 30% 0 0;
@@ -172,7 +252,6 @@
         top: 74%;
     }
 
-
     .desk {
         top: 53px;
     }
@@ -195,6 +274,9 @@
 
 /* Keep clouds visible and still when reduced motion is requested */
 @media (prefers-reduced-motion: reduce) {
+    .welcome-active .scenery {
+        transition: none;
+    }
     .cloud {
         animation: none;
         translate: none;

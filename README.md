@@ -16,14 +16,13 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 
 ## Architecture
 
-* [ ] Web tech(html/css/js)
+* [x] HTML, CSS, and JavaScript
 * [x] PeerJS / WebRTC with individual page IDs
 
 ## Software Features
 
-* [ ] File share
+* [x] File and website-link sharing
 * [x] Two-way rocket packages and parachutes with receipt confirmations
-* [ ] Keep going ....
 
 ## Team Communication
 
@@ -41,19 +40,17 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 |Create & Display Presentations      |Spencer                     |
 |Submit Team Assignments             |Spencer                     |
 
-## Reflections
+## Welcome screen
 
-# AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIIIIIIIEEEEEEE
-(temp text)
+Enter a display name and click **Connect** to pan from the higher sky down to
+the sharing scene. The title moves into the top-left corner during the descent.
+The name is kept for this tab's session and displayed beside the connection badge;
+it is separate from the PeerJS page ID. Your display name accompanies each file or link offer.
 
-## Microphone
-
-Click the microphone button in the bottom-right corner and allow microphone
-access when your browser prompts you. Click it again to release the microphone.
-This currently enables local access only; audio is not recorded or transmitted.
-Microphone access requires HTTPS or `http://localhost:3000`. A plain HTTP
-Same Wi-Fi address can still connect parachutes, but cannot access the microphone;
-use an HTTPS deployment for microphone access on both computers.
+The explanation beneath the form previews location and quiet audio signals for
+future nearby discovery. The welcome Connect button does not request either
+permission.
+Reduced-motion preferences skip the pan and keep clouds still.
 
 ## Connect two computers
 
@@ -69,10 +66,13 @@ also run its own local server; they do not need to share a Node server.
    click **Connect**. Only one person needs to initiate the connection.
 4. Both badges show **Connected** once the actual data channel opens. Each page
    keeps its own ID, and the other person's ID appears in the friend's ID field.
-5. Choose **Package artwork** and click **Drop parachute ↑** on either computer.
-   Its rocket launches, and a matching parachute appears on the other computer.
-   Receipt is automatic; **delivered** means the other browser acknowledged it.
-6. **Disconnect** unpairs the pages and keeps their IDs available for reconnecting.
+5. Click **Drop parachute**, choose files or enter a full website URL, then click
+   **Send files** or **Send link**. The recipient sees your name and the contents
+   and chooses **Accept** or **Decline**. After acceptance, the rocket launches.
+6. Open **Received** on the other computer to save each file or open the link.
+   A matching parachute also arrives; catching it in the box opens Received.
+   Missing the parachute does not lose the transfer.
+7. **Disconnect** unpairs the pages and keeps their IDs available for reconnecting.
    **Retry** restarts PeerJS after a service failure and generates a new ID.
 
 The connection core matches `peerjs-test.html`: `new Peer({ debug: 2 })`,
@@ -88,42 +88,56 @@ and hyphens. Keep both pages open. Only one friend connects at a time; another
 incoming connection cannot replace an existing friend. Clicking outside the
 dropdown or pressing Escape closes it.
 
-This milestone sends the app's rocket launch action and parachute artwork type,
-with an empty payload array. The folder option selects existing folder artwork;
-no file bytes, directory contents, links, or actual folders are transferred.
-Example packet (the real ID is a random UUID):
+## How file and link sharing works
 
-```json
-{
-  "type": "package",
-  "version": 1,
-  "id": "unique-package-id",
-  "rocket": { "action": "launch" },
-  "parachute": { "kind": "picture", "payload": [] }
-}
-```
+`connection.js` establishes the PeerJS/WebRTC data channel. `sharing.js` handles
+file selection, incoming approval, progress, and download links. `transfer.js`
+handles the content protocol independently of the animations.
 
-Receipts contain only `{ "type": "receipt", "version": 1, "id": "unique-package-id" }`.
-Malformed packages and nonempty payloads are rejected. Duplicate package IDs
-are acknowledged without creating another parachute. Sending waits for receipt,
-with a ten-second timeout that reports delivery as unconfirmed. Up to 20
-parachutes can be on screen at once; a full sky does not acknowledge another
-package. A disconnect during rocket launch cancels that transfer.
+1. **Offer:** send the display name and file names, sizes, and MIME types, or the
+   website URL. No file bytes are sent until the other person accepts.
+2. **Accept:** the recipient approves; the sender launches the rocket.
+3. **Chunks:** read files in 64 KiB slices with `File.slice().arrayBuffer()`.
+   Send one binary slice at a time and wait for a `chunk-received` reply before
+   reading the next. This keeps queued data bounded and supplies progress.
+4. **Finish:** the receiver checks every file's byte count, rebuilds each `File`,
+   adds it to Received, and sends `complete`. Only then does the sender report
+   delivered. WebRTC provides transport integrity; byte counts catch incomplete
+   app-level transfers, rather than replacing transport integrity checks.
+5. **Save:** `URL.createObjectURL(file)` creates a local download address for an
+   anchor with the `download` attribute. The receiver clicks it to save. Links
+   allow only HTTP/HTTPS and open only when clicked. Remote text uses
+   `textContent`, never HTML insertion. File names cannot contain path separators.
+
+The version-2 messages are `offer`, `accept`, `decline`, `chunk`,
+`chunk-received`, `finish`, `complete`, and `cancel`. A random transfer ID ties
+replies to the correct send. Each chunk includes file index, byte offset, sequence
+number, and binary bytes.
+
+Limits: 20 files, 100 MiB (shown as 100 MB in the UI) per transfer; 100 MiB total
+retained in Received and 100 retained transfers per tab. Zip ordinary folders
+first. The browser retains received content in memory until Remove, page exit,
+or refresh; save it first. Remove revokes download URLs and cancels that entry's
+remaining animation. Transfers are not resumable. Disconnects, cancellation,
+invalid chunks, or inactivity abort incomplete transfers. There is a 60-second
+acceptance timeout and a 30-second wait for each acknowledgment. A sender using
+an old page that does not support this protocol will time out; refresh both pages.
+
+Files travel over the peer data channel, rather than being uploaded to this
+Node server. PeerJS signaling introduces the peers; a configured TURN service
+may relay encrypted WebRTC traffic when a direct connection is unavailable.
+See the [PeerJS DataConnection documentation](https://peerjs.com/client/api/data-connection).
 
 The app uses the same default PeerJS network settings as `peerjs-test.html`.
 PeerJS Cloud handles signaling; the Node server only serves static files.
-The old HTTP relay and its `/api/*` connection endpoints have been removed.
 
-Direct connections can be blocked by school Wi-Fi, NAT, or a firewall. Our
-previous diagnostics found that the bundled default TURN hosts were not
-resolving. This change does not add a working TURN service or bypass network
-restrictions. For reliable use on restrictive networks, working TURN
-configuration is a separate requirement.
+Direct connections can be blocked by school Wi-Fi, NAT, or a firewall.
+Restrictive networks may need a working TURN relay.
 
-Run `npm test` for controller, animation, microphone, and static server checks.
+Run `npm test` for connection, animation, file transfer, and static server checks.
 For a real two-browser test, install Playwright (`npm install --no-save playwright`)
 and Microsoft Edge, then run `node tests/peerjs-browser.cjs`. This verifies
-page-ID connections, packages and acknowledgments in both directions,
+page-ID connections, files and links in both directions,
 disconnecting without changing IDs, reconnecting, and compatibility with the
 unmodified simple test page. It uses separate browser contexts on one machine;
 two physical computers still need a test on the intended network.
@@ -134,7 +148,7 @@ Load `parachute.js` with `defer` after the page markup. Once loaded, the shared
 `window.animation` API can be called from any script, module, or event handler.
 Each drop creates an independent parachute; repeated calls do not replace active
 ones. Methods are bound, so passing `animation.dropMusic` directly as a callback
-also works. `initialize()` is safe to repeat and never starts an extra demo.
+also works. `initialize()` is safe to repeat.
 
 ```js
 animation.dropFile();       // Paper document
@@ -150,7 +164,6 @@ const delivery = animation.dropMusic(audioFile);
 animation.dropLink('https://example.com');
 animation.dropParachute(file); // Infer artwork from MIME type or extension
 animation.dropParachute(files); // Multiple files use the folder artwork
-await animation.launchRocketWithFile(file); // Preview preparation, launch, then matching drop
 
 // Independent hooks used by the connection lifecycle (no file required).
 animation.startConnecting(); // Loop glow, engine flicker, and smoke on the pad
@@ -165,10 +178,10 @@ Releasing the pointer anywhere on the main box lifts that same delivery above
 the rim, then lowers it in front of the dark interior and behind the front panel.
 The flaps close only after the delivery is completely inside. The sequence
 then emits `file-received` on `.drop-box`, with the
-original payload array in `event.detail.files`. The rocket emits `file-launched`
-with the same shape. These animations do not transmit files or open links.
-Existing `Animation.dropParachute(...)` calls remain supported; new code should
-use `window.animation`. `window.ParachuteAnimation` exposes the controller class.
+original payload array in `event.detail.files`. The sharing controller listens
+for this event to open Received. The animations themselves do not transmit data.
+`window.animation` provides the public methods. `window.ParachuteAnimation`
+exposes the controller class.
 
 Drag and release to throw a delivery left or right; gentle drag reduces its
 momentum as it falls. Both side walls bounce thrown deliveries back into view,
@@ -178,13 +191,11 @@ or resumes, arrow keys move the focused delivery, and Enter receives it when its
 payload is over the main box. While dragging, the parachute appears in front of
 the box and table; releasing restores its usual layer. Pointer drops use the
 mouse/touch position rather than the trailing artwork. The box closes on receipt
-and reopens three seconds after the latest receipt. Saving will be added later.
+and reopens three seconds after the latest receipt.
 
 The drop button stays on the pad throughout both rocket animations. The peer
 controller uses the independent connection hooks so preparation continues until
-the connection succeeds or is cancelled. `launchRocketWithFile` remains a legacy
-local preview helper for pages that provide an upload input; it is inactive on
-the main page and does not transmit files.
-`launchRocket()` alone does not create a file delivery or emit `file-launched`.
+the connection succeeds or is cancelled. `launchRocket()` only plays the launch
+animation; `sharing.js` starts it after the recipient accepts.
 
 Run controller and physics checks with `node --test tests/animation.test.cjs`.
