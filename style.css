@@ -1151,3 +1151,13 @@ body:not(.has-entered) .transfer-tools {
     outline: 3px solid #356294;
     outline-offset: 3px;
 }
+
+/* Nearby discovery has no scanning animation; reserve its status for a future one. */
+#welcome-status:not(:empty) { margin-top: 12px; font-weight: bold; }
+#welcome-reload { margin-top: 8px; padding: 8px 12px; font-size: 13px; }
+.connection-card h2 { font-size: 16px; margin: 0 0 12px; }
+.nearby-devices { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.nearby-devices button { width: 100%; text-align: left; overflow-wrap: anywhere; }
+.nearby-devices button[aria-pressed='true'] { background: #c9eddf; }
+.connection-card #nearby-empty { margin-bottom: 14px; }
+.connection-actions { flex-wrap: wrap; }

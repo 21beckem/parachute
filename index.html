@@ -12,7 +12,7 @@
         <link rel="stylesheet" href="background.css" />
         <link rel="stylesheet" href="style.css" />
         <script src="parachute.js" defer></script>
-        <script src="vendor/peerjs.min.js" defer></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
         <script src="transfer.js" defer></script>
         <script src="connection.js" defer></script>
         <script src="welcome.js" defer></script>
@@ -289,17 +289,19 @@
                         required
                         aria-describedby="name-explanation"
                     />
-                    <button type="submit">Connect</button>
+                    <button id="welcome-connect" type="submit">Connect</button>
                 </div>
                 <p id="name-explanation">
                     The name people will see when you share files.
                 </p>
+                <p id="welcome-status" role="status" aria-live="polite"></p>
+                <button id="welcome-reload" type="button" hidden>Cancel and reload</button>
             </form>
             <div class="permission-explanation">
                 <p>
-                    Your location helps find people next to you, and microphone
-                    access helps detect very quiet sound signals between devices
-                    to tell who’s nearby.
+                    Connect will ask for your microphone and location. We compare
+                    room sound to find nearby devices. Please allow five seconds
+                    after both permissions are accepted before choosing a device.
                 </p>
             </div>
         </section>
@@ -329,62 +331,23 @@
                 <details class="connection-panel">
                     <summary class="status">
                         <span class="status-dot"></span
-                        ><span id="connection-state">Connecting…</span>
+                        ><span id="connection-state">Not connected</span>
                     </summary>
                     <div class="connection-card">
-                        <label for="local-peer-id">Your page ID</label>
-                        <div class="connection-row">
-                            <input
-                                id="local-peer-id"
-                                readonly
-                                placeholder="Getting your page ID…"
-                                spellcheck="false"
-                            />
-                            <button id="copy-peer-id" type="button" disabled>
-                                Copy
-                            </button>
-                        </div>
-                        <form id="connect-form">
-                            <label for="remote-peer-id"
-                                >Your friend’s page ID</label
-                            >
-                            <div class="connection-row">
-                                <input
-                                    id="remote-peer-id"
-                                    placeholder="Paste their complete PeerJS ID"
-                                    autocomplete="off"
-                                    autocapitalize="off"
-                                    spellcheck="false"
-                                    required
-                                />
-                                <button
-                                    id="connect-peer"
-                                    type="submit"
-                                    disabled
-                                >
-                                    Connect
-                                </button>
-                            </div>
-                        </form>
+                        <h2>Nearby devices</h2>
+                        <ul id="nearby-devices" class="nearby-devices" aria-label="Nearby devices"></ul>
+                        <p id="nearby-empty">Nearby devices will appear after you connect.</p>
                         <div class="connection-actions">
-                            <button id="disconnect-peer" type="button" hidden>
-                                Disconnect
-                            </button>
-                            <button id="retry-peer" type="button" hidden>
-                                Retry
-                            </button>
+                            <button id="disconnect-device" type="button" hidden>Clear selection</button>
+                            <button id="stop-discovery" type="button" hidden>Stop discovery</button>
+                            <button id="retry-discovery" type="button" hidden>Reload to reconnect</button>
                         </div>
-                        <p
-                            id="connection-message"
-                            role="status"
-                            aria-live="polite"
-                        >
-                            Open this website on both computers, then copy one
-                            page’s ID into the other page. Keep both pages open.
+                        <p id="connection-message" role="status" aria-live="polite">
+                            Click Connect to find nearby people.
                         </p>
                         <p class="connection-note">
-                            One friend at a time. Keep both pages open while
-                            sharing. Refreshing creates a new page ID.
+                            Choose one person at a time. Keep both pages open while sharing.
+                            Files pass through the sharing service after the recipient accepts.
                         </p>
                     </div>
                 </details>

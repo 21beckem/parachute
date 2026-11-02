@@ -1,4 +1,4 @@
-// File transport over an already-open PeerJS data connection.
+// File protocol over the selected MeshClient relay adapter.
 // Each chunk waits for acknowledgment, keeping the network queue bounded.
 class ParachuteTransfer {
     static MAX_BYTES = 100 * 1024 * 1024;
@@ -275,7 +275,7 @@ class ParachuteTransfer {
         }
         if (!state.accepted) return;
         if (data.type === 'chunk') {
-            // BinaryPack versions may decode binary fields as a typed array.
+            // MeshClient relays deliver binary payloads as typed arrays.
             const bytes = ArrayBuffer.isView(data.bytes)
                 ? data.bytes.buffer.slice(
                       data.bytes.byteOffset,

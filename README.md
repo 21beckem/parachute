@@ -12,12 +12,12 @@ Conner Madsen
 
 ## Software Description
 
-A Peer-to-peer file sharing application over the web with robust interactive visuals.
+A nearby file-sharing website with interactive rockets and parachutes.
 
 ## Architecture
 
 * [x] HTML, CSS, and JavaScript
-* [x] PeerJS / WebRTC with individual page IDs
+* [x] MeshClient nearby discovery and server-relayed sharing
 
 ## Software Features
 
@@ -40,57 +40,70 @@ A Peer-to-peer file sharing application over the web with robust interactive vis
 |Create & Display Presentations      |Spencer                     |
 |Submit Team Assignments             |Spencer                     |
 
-## Welcome screen
+## Connect and find nearby devices
 
-Enter a display name and click **Connect** to pan from the higher sky down to
-the sharing scene. The title moves into the top-left corner during the descent.
-The name is kept for this tab's session and displayed beside the connection badge;
-it is separate from the PeerJS page ID. Your display name accompanies each file or link offer.
+Run `node server.cjs` (Node.js 20+, or use `npm start`) and open `http://localhost:3000`.
+For two physical devices, serve the Node app over HTTPS. An ordinary HTTP LAN
+address cannot request microphone and location access in most browsers.
 
-The explanation beneath the form previews location and quiet audio signals for
-future nearby discovery. The welcome Connect button does not request either
-permission.
-Reduced-motion preferences skip the pan and keep clouds still.
+1. Enter a display name and click **Connect**.
+2. Allow **both microphone and location**. Neither is requested on page load.
+3. Wait at least **five seconds after both permissions succeed**. The scanner
+   also waits for MeshClient's first audio feature packet and server readiness.
+   There is no new scanning animation.
+4. The nearby-device list opens. Open Parachute on another device, follow the
+   same steps, and wait for the room match and name exchange.
+5. Choose a named device, then click **Drop parachute** to send files or a link.
+   The recipient must accept before file bytes are sent.
+6. Use **Received** to save files or open links. The rocket and parachute
+   delivery animations still work.
 
-## Connect two computers
+The list can show several nearby devices; sharing targets one person at a time.
+Incoming offers from another matched device select that sender when you are idle.
+Other offers are declined while a transfer is pending or active. A lost match or
+server disconnection cancels the selected session. **Clear selection** leaves
+nearby discovery running. **Stop discovery** reloads the page to release the
+microphone, because the upstream singleton does not expose microphone cleanup or
+reconnection. Save received files before stopping or reloading.
 
-Run `npm start` (Node.js 20+) and open `http://localhost:3000`.
-For computers on different networks, serve this folder on a public HTTPS site
-and open it on both computers. Static hosting works too: PeerJS Cloud provides
-signaling, and packages use a reliable WebRTC data channel. Each computer can
-also run its own local server; they do not need to share a Node server.
+## Hosted MeshClient
 
-1. Open the connection badge at the top right on computer A.
-2. Copy **Your page ID** and share the complete ID with B.
-3. On B, open the badge, paste A's ID under **Your friend's page ID**, and
-   click **Connect**. Only one person needs to initiate the connection.
-4. Both badges show **Connected** once the actual data channel opens. Each page
-   keeps its own ID, and the other person's ID appears in the friend's ID field.
-5. Click **Drop parachute**, choose files or enter a full website URL, then click
-   **Send files** or **Send link**. The recipient sees your name and the contents
-   and chooses **Accept** or **Decline**. After acceptance, the rocket launches.
-6. Open **Received** on the other computer to save each file or open the link.
-   A matching parachute also arrives; catching it in the box opens Received.
-   Missing the parachute does not lose the transfer.
-7. **Disconnect** unpairs the pages and keeps their IDs available for reconnecting.
-   **Retry** restarts PeerJS after a service failure and generates a new ID.
+`connection.js` imports only
+`/mesh-runtime/durable-object-server/mesh/mesh-client.js`. Its dependencies load
+automatically. `server.cjs` streams the modules, audio worker/worklet, model JSON,
+and WASM from the repository's live GitHub Pages site. No detection code or model
+is copied into this checkout, and no detection server is deployed. Assets have a
+60-second memory cache; reload after upstream changes. NoSleep is loaded from the
+same CDN used by the upstream demo.
 
-The connection core matches `peerjs-test.html`: `new Peer({ debug: 2 })`,
-`peer.on('open', id => ...)`, `peer.connect(otherId)`, and
-`peer.on('connection', conn => ...)`. There are no rooms or connection codes,
-and no custom metadata is required to connect. The simple test page and the
-main page can establish a data connection with each other; only the main app
-understands rocket/parachute packages.
+The asset bridge is required because browser workers must be created from this
+website's origin. It changes only the upstream `isHostedLocally` flag to `false`
+so localhost uses the default hosted WebSocket server defined by MeshClient,
+rather than expecting a separate detector on port 8787. The server address stays
+in the upstream module. Other detection and protocol code is served unchanged.
+If that module's local-host setting changes shape, the bridge returns an error
+instead of silently connecting to a wrong endpoint.
 
-IDs identify a browser page session, not a physical computer or hardware ID.
-Refreshing creates a new ID. Copy the full ID exactly, including capitalization
-and hyphens. Keep both pages open. Only one friend connects at a time; another
-incoming connection cannot replace an existing friend. Clicking outside the
-dropdown or pressing Escape closes it.
+Run this Node server in production as well: plain static hosting does not provide
+`/mesh-runtime/`. Microphone and location access require HTTPS (localhost is the
+local-development exception). An internet connection and the upstream hosted
+service are required.
+
+Discovery compares ambient room sound, not emitted tones. Audio features are
+prepared locally and sent to the detector for matching. Display names are
+exchanged with matched devices through `relayMessage()`. JSON transfer messages
+use `relayMessage()` and binary file chunks use `relay()`. Files pass through the
+hosted server rather than a PeerJS/WebRTC data channel.
+
+Future scanning animations can listen for `discovery-warmup-start` (with
+`durationMs` and `startedAt`), `discovery-warmup-end`, and
+`discovery-warmup-error` events on `window`. The end event means both the minimum
+five-second window and MeshClient readiness have completed; it does not mean a
+nearby match has already been found.
 
 ## How file and link sharing works
 
-`connection.js` establishes the PeerJS/WebRTC data channel. `sharing.js` handles
+`connection.js` adapts the selected MeshClient peer to the transfer protocol. `sharing.js` handles
 file selection, incoming approval, progress, and download links. `transfer.js`
 handles the content protocol independently of the animations.
 
@@ -102,8 +115,8 @@ handles the content protocol independently of the animations.
    reading the next. This keeps queued data bounded and supplies progress.
 4. **Finish:** the receiver checks every file's byte count, rebuilds each `File`,
    adds it to Received, and sends `complete`. Only then does the sender report
-   delivered. WebRTC provides transport integrity; byte counts catch incomplete
-   app-level transfers, rather than replacing transport integrity checks.
+   delivered. Byte counts catch incomplete app-level transfers; the relay carries binary
+   data over the service connection.
 5. **Save:** `URL.createObjectURL(file)` creates a local download address for an
    anchor with the `download` attribute. The receiver clicks it to save. Links
    allow only HTTP/HTTPS and open only when clicked. Remote text uses
@@ -123,24 +136,17 @@ invalid chunks, or inactivity abort incomplete transfers. There is a 60-second
 acceptance timeout and a 30-second wait for each acknowledgment. A sender using
 an old page that does not support this protocol will time out; refresh both pages.
 
-Files travel over the peer data channel, rather than being uploaded to this
-Node server. PeerJS signaling introduces the peers; a configured TURN service
-may relay encrypted WebRTC traffic when a direct connection is unavailable.
-See the [PeerJS DataConnection documentation](https://peerjs.com/client/api/data-connection).
+Run `npm test` for nearby discovery, permission timing, consent, binary relay
+adaptation, file transfer, animation, and asset-server checks. Connection tests
+use a simulated mesh to test the app independently of live microphone hardware.
+The historical `peerjs-test.html` and `tests/peerjs-browser.cjs` remain as reference
+examples only; the main app no longer loads or uses PeerJS. Real same-room
+matching still needs a two-device check against the hosted service.
 
-The app uses the same default PeerJS network settings as `peerjs-test.html`.
-PeerJS Cloud handles signaling; the Node server only serves static files.
-
-Direct connections can be blocked by school Wi-Fi, NAT, or a firewall.
-Restrictive networks may need a working TURN relay.
-
-Run `npm test` for connection, animation, file transfer, and static server checks.
-For a real two-browser test, install Playwright (`npm install --no-save playwright`)
-and Microsoft Edge, then run `node tests/peerjs-browser.cjs`. This verifies
-page-ID connections, files and links in both directions,
-disconnecting without changing IDs, reconnecting, and compatibility with the
-unmodified simple test page. It uses separate browser contexts on one machine;
-two physical computers still need a test on the intended network.
+For a browser-only UI check, run `node tests/mesh-preview.cjs` and open
+`http://localhost:3001` in two tabs. This fixture uses fake permissions and a
+simulated mesh, so it does not access the microphone or location or test the
+real detector. The normal website at port 3000 always uses the hosted module.
 
 ## Animation API
 

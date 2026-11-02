@@ -1,4 +1,4 @@
-// Static files only. PeerJS handles signaling; WebRTC carries packages.
+// Website assets and a live, same-origin bridge to the hosted MeshClient assets.
 const http = require('node:http');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
@@ -18,13 +18,54 @@ const assets = new Map([
     ['/vendor/peerjs.min.js', ['vendor/peerjs.min.js', 'text/javascript']]
 ]);
 
-function createParachuteServer() {
+const meshOrigin = 'https://21beckem.github.io/same-room-detector/';
+const meshEntry = 'durable-object-server/mesh/mesh-client.js';
+const meshPaths = /^(?:durable-object-server\/(?:mesh|src\/protocol)\/[^/]+\.js|exports\/compare\/[^/]+\.js|model_output\/model\.json|web-calibration\/wasm_parity\/wasm\/same_room\.wasm)$/;
+
+function createParachuteServer({ fetchMesh = fetch } = {}) {
+    const cache = new Map();
     const server = http.createServer(async (req, res) => {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Referrer-Policy', 'no-referrer');
         try {
+            const pathname = new URL(req.url, 'http://localhost').pathname;
+            if (pathname.startsWith('/mesh-runtime/') && ['GET', 'HEAD'].includes(req.method)) {
+                const resource = pathname.slice('/mesh-runtime/'.length);
+                if (!meshPaths.test(resource)) {
+                    res.writeHead(404);
+                    return res.end('Not found.');
+                }
+                try {
+                    let asset = cache.get(resource);
+                    if (!asset || asset.expires < Date.now()) {
+                        const upstream = await fetchMesh(new URL(resource, meshOrigin), {
+                            signal: AbortSignal.timeout(20000)
+                        });
+                        if (!upstream.ok) throw Error(`Mesh asset returned ${upstream.status}`);
+                        let data = Buffer.from(await upstream.arrayBuffer());
+                        if (resource === meshEntry) {
+                            // Keep the upstream default server URL, even on localhost.
+                            // No detection logic or endpoint is copied into this website.
+                            const source = data.toString('utf8');
+                            const setting = /^const isHostedLocally = .+;$/m;
+                            if (!setting.test(source)) throw Error('MeshClient local-host setting changed; update the asset bridge.');
+                            data = Buffer.from(source.replace(setting, 'const isHostedLocally = false;'));
+                        }
+                        asset = { data, expires: Date.now() + 60000 };
+                        cache.set(resource, asset);
+                    }
+                    const type = resource.endsWith('.wasm') ? 'application/wasm'
+                        : resource.endsWith('.json') ? 'application/json' : 'text/javascript';
+                    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
+                    return res.end(req.method === 'HEAD' ? undefined : asset.data);
+                } catch (error) {
+                    console.error('Mesh asset unavailable:', error.message);
+                    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    return res.end('The nearby discovery service could not load. Please retry.');
+                }
+            }
             const asset = assets.get(
-                new URL(req.url, 'http://localhost').pathname
+                pathname
             );
             if (!asset || !['GET', 'HEAD'].includes(req.method)) {
                 res.writeHead(404, {
@@ -63,7 +104,7 @@ if (require.main === module) {
             }
         }
         console.log(
-            'Open the website on both computers, then share a PeerJS page ID.'
+            'Open the website on both devices and click Connect to find nearby people.'
         );
     });
 }

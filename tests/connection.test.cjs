@@ -4,258 +4,229 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { webcrypto } = require('node:crypto');
-const source = fs.readFileSync(
-    require('node:path').join(__dirname, '../connection.js'),
-    'utf8'
-);
-const tick = () => new Promise((resolve) => setImmediate(resolve));
+const path = require('node:path');
+// Substitute only the network import; exercise the real controller and transfer protocol.
+const source = fs.readFileSync(path.join(__dirname, '../connection.js'), 'utf8')
+    .replace('import(MESH_CLIENT_URL)', 'window.loadMesh()');
+const transferSource = fs.readFileSync(path.join(__dirname, '../transfer.js'), 'utf8');
+const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
+const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 
-function setup() {
-    const peers = new Map(),
-        clients = [];
-    class Channel extends EventEmitter {
-        constructor(peer, options) {
-            super();
-            Object.assign(this, options);
-            this.peer = peer;
-            this.open = false;
-            this.sent = [];
-        }
-        send(data) {
-            if (!this.open) throw Error('closed');
-            this.sent.push(data);
-            setImmediate(() => {
-                if (this.other.open)
-                    this.other.emit('data', JSON.parse(JSON.stringify(data)));
+function setup(t) {
+    const clients = new Map();
+    function client(uid, { audio, geo, beginResult, loadFailure } = {}) {
+        const events = [], elements = new Map(), timers = new Map();
+        let now = 0, timerId = 0, stopped = 0, reloads = 0;
+        const stream = { getTracks: () => [{ stop: () => stopped++ }] };
+        const panel = { dataset: {}, contains: () => false, querySelector: () => ({ focus() {} }) };
+        function element(id) {
+            if (!elements.has(id)) elements.set(id, {
+                textContent: '', disabled: false, hidden: false, children: [], listeners: {},
+                addEventListener(event, fn) { this.listeners[event] = fn; },
+                closest: () => panel,
+                replaceChildren(...items) { this.children = items; },
+                append(...items) { this.children.push(...items); },
+                setAttribute(key, value) { this[key] = value; }
             });
+            return elements.get(id);
         }
-        close() {
-            if (this.closed) return;
-            this.closed = true;
-            this.open = false;
-            this.emit('close');
-            this.other?.close();
-        }
-    }
-    class Peer extends EventEmitter {
-        constructor(options) {
-            super();
-            assert.equal(options.debug, 2);
-            this.id = `Page-${webcrypto.randomUUID()}`;
-            peers.set(this.id, this);
-            setImmediate(() => {
-                if (!this.destroyed) this.emit('open', this.id);
-            });
-        }
-        connect(id, options) {
-            const a = new Channel(id, options),
-                target = peers.get(id);
-            if (!target) {
-                setImmediate(() =>
-                    this.emit('error', { type: 'peer-unavailable' })
-                );
-                return a;
-            }
-            const b = new Channel(this.id, options);
-            a.other = b;
-            b.other = a;
-            setImmediate(() => {
-                target.emit('connection', b);
-                if (b.closed) return;
-                a.open = b.open = true;
-                a.emit('open');
-                b.emit('open');
-            });
-            return a;
-        }
-        destroy() {
-            this.destroyed = true;
-            peers.delete(this.id);
-        }
-    }
-    function client() {
-        const elements = {},
-            listeners = {},
-            packets = [];
-        const panel = {
-            dataset: {},
-            contains: (target) => target === panel,
-            open: false,
-            querySelector: () => ({ focus() {} })
-        };
-        const document = {
-            addEventListener: (event, fn) => (listeners[event] = fn),
-            getElementById: (id) =>
-                (elements[id] ||= {
-                    value: '',
-                    addEventListener() {},
-                    closest: () => panel,
-                    focus() {},
-                    select() {}
-                })
+        const emitter = new EventEmitter();
+        const mesh = {
+            uid, peers: [], connected: false, calls: [],
+            on(event, callback) { emitter.on(event, callback); return () => emitter.off(event, callback); },
+            emit: (...args) => emitter.emit(...args),
+            async init() { this.connected = true; this.emit('initialized'); },
+            async begin() { this.calls.push('begin'); return beginResult ? beginResult.promise : { success: true }; },
+            async relayMessage(to, msg) {
+                this.calls.push({ type: 'message', to, msg });
+                await new Promise(setImmediate);
+                clients.get(to)?.mesh.emit('relayMessage', { from: uid, msg: structuredClone(msg) });
+            },
+            async relay(to, data, options) {
+                this.calls.push({ type: 'binary', to, data, options });
+                await new Promise(setImmediate);
+                clients.get(to)?.mesh.emit('relay', { from: uid, payload: new Uint8Array(data), meta: options.meta });
+            },
+            disconnect() { this.connected = false; }
         };
         const window = {
+            isSecureContext: true,
             addEventListener() {},
-            animation: { startConnecting() {}, stopConnecting() {} },
+            dispatchEvent(event) { events.push({ type: event.type, detail: event.detail, at: now }); },
+            loadMesh: async () => { if (loadFailure) throw Error('offline'); return { MeshClient: mesh }; },
             parachuteSharing: {
-                sync() {},
-                reset() {},
-                connected() {},
-                transport: { receive: (data) => packets.push(data) }
+                transport: null, sync() {},
+                reset() { this.transport?.close(); this.transport = null; },
+                connected(channel) {
+                    this.reset();
+                    this.transport = new window.ParachuteTransfer(channel, {
+                        onOffer: (offer) => { if (offer && this.autoAccept) this.transport.accept(); },
+                        onComplete: (result) => this.results.push(result)
+                    });
+                },
+                results: [], autoAccept: false
             }
         };
-        vm.runInNewContext(source, {
-            window,
-            document,
-            navigator: {},
-            Peer,
-            crypto: webcrypto,
-            setTimeout,
-            clearTimeout,
-            console: { error() {} }
-        });
-        const result = {
-            c: window.parachuteConnection,
-            window,
-            panel,
-            listeners,
-            packets
+        class Clock extends Date { static now() { return now; } }
+        const context = {
+            window, document: { getElementById: element, createElement: () => element(Symbol()), addEventListener() {} },
+            navigator: {
+                mediaDevices: { getUserMedia: () => audio ? audio.promise : Promise.resolve(stream) },
+                geolocation: { getCurrentPosition: (resolve, reject) => geo ? geo.promise.then(resolve, reject) : resolve({ coords: {} }) }
+            },
+            location: { reload: () => reloads++ },
+            CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+            Date: Clock, ArrayBuffer, Uint8Array, File, Blob, URL, crypto: webcrypto,
+            setTimeout(fn, ms) { const id = ++timerId; timers.set(id, { fn, at: now + ms }); return id; },
+            clearTimeout(id) { timers.delete(id); }, console
         };
-        clients.push(result);
+        vm.runInNewContext(transferSource, context);
+        vm.runInNewContext(source, context);
+        const result = {
+            c: window.parachuteConnection, window, mesh, events, elements, element,
+            get stopped() { return stopped; }, get reloads() { return reloads; },
+            async advance(ms) {
+                now += ms;
+                for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.fn(); }
+                await flush();
+            }
+        };
+        clients.set(uid, result);
+        t.after(() => result.c.destroy());
         return result;
     }
-    return { client, close: () => clients.forEach((s) => s.c.destroy()) };
-}
-async function pair(t) {
-    const s = setup();
-    t.after(s.close);
-    const a = s.client(),
-        b = s.client();
-    await tick();
-    b.c.remote.value = ` ${a.c.local.value} `;
-    b.c.connectToPeer();
-    await tick();
-    await tick();
-    assert.equal(a.c.state.textContent, 'Connected');
-    assert.equal(b.c.state.textContent, 'Connected');
-    assert.notEqual(a.c.local.value, b.c.local.value);
-    assert.equal(a.c.remote.value, b.c.local.value);
-    assert.equal(b.c.remote.value, a.c.local.value);
-    return { ...s, a, b };
-}
-
-test('page IDs connect directly and forward transfer messages in both directions', async (t) => {
-    const { a, b } = await pair(t);
-    const packet = {
-        version: 2,
-        type: 'offer',
-        id: 'test',
-        sender: 'Sender',
-        kind: 'link',
-        url: 'https://example.com/'
-    };
-    a.c.channel.send(packet);
-    await tick();
-    assert.equal(b.packets[0].url, packet.url);
-    assert.equal(a.c.channel.reliable, true);
-    b.c.channel.send({ version: 2, type: 'accept', id: 'test' });
-    await tick();
-    assert.equal(a.packets[0].type, 'accept');
-    assert.equal(a.c.send.disabled, false);
-    const id = a.c.local.value;
-    a.c.closeConnection();
-    assert.equal(a.c.local.value, id);
-    assert.equal(b.c.ready, true);
-    assert.equal(b.c.send.disabled, true);
-});
-
-test('invalid, self, missing and busy peers are handled; dropdown closes', async (t) => {
-    const { a, b, client } = await pair(t);
-    const c = client();
-    await tick();
-    for (const code of ['bad/id', c.c.local.value]) {
-        c.c.remote.value = code;
-        c.c.connectToPeer();
-        assert.equal(c.c.ready, true);
+    async function start(result, name) {
+        await result.c.loading;
+        const pending = result.c.begin(name);
+        await flush();
+        await result.advance(5000);
+        assert.equal(await pending, true);
     }
-    c.c.remote.value = a.c.local.value;
-    c.c.connectToPeer();
-    await tick();
-    await tick();
-    assert.equal(a.c.state.textContent, 'Connected');
-    assert.equal(b.c.state.textContent, 'Connected');
-    assert.equal(c.c.send.disabled, true);
-    c.c.start();
-    await tick();
-    const id = c.c.local.value;
-    c.c.remote.value = 'missing-peer';
-    c.c.connectToPeer();
-    await tick();
-    await tick();
-    assert.match(c.c.message.textContent, /Peer not found/);
-    assert.equal(c.c.local.value, id);
-    assert.equal(c.c.connect.disabled, false);
-    a.panel.open = true;
-    a.listeners.click({ target: {} });
-    assert.equal(a.panel.open, false);
-    a.panel.open = true;
-    a.listeners.keydown({ key: 'Escape' });
-    assert.equal(a.panel.open, false);
+    function match(a, b) {
+        a.mesh.peers.push(b.mesh.uid); b.mesh.peers.push(a.mesh.uid);
+        a.mesh.emit('peerAdded', { uid: b.mesh.uid }); b.mesh.emit('peerAdded', { uid: a.mesh.uid });
+    }
+    return { client, start, match };
+}
+
+test('both permissions must succeed before the five-second selection window starts', async (t) => {
+    const { client } = setup(t);
+    const audio = deferred(), geo = deferred();
+    const a = client(1, { audio, geo });
+    await a.c.loading;
+    const pending = a.c.begin('A');
+    audio.resolve({ getTracks: () => [{ stop() {} }] });
+    await a.advance(10000);
+    assert.equal(a.events.some(e => e.type === 'discovery-warmup-start'), false);
+    assert.equal(a.mesh.calls.length, 0);
+    geo.resolve({ coords: {} });
+    await flush();
+    assert.equal(a.events.find(e => e.type === 'discovery-warmup-start').at, 10000);
+    await a.advance(4999);
+    assert.equal(a.c.active, false);
+    a.c.selectDevice(2);
+    assert.equal(a.c.channel, null);
+    await a.advance(1);
+    assert.equal(await pending, true);
+    assert.equal(a.c.active, true);
 });
 
-test('messages from a previous connection are ignored after a restart', async (t) => {
-    const { a, b } = await pair(t);
-    const oldChannel = a.c.channel;
-    a.c.start();
-    oldChannel.emit('data', { version: 2, type: 'offer', id: 'stale' });
-    assert.equal(a.packets.length, 0);
-    assert.equal(b.c.send.disabled, true);
-    await tick();
+test('a slow analyzer keeps selection locked beyond five seconds', async (t) => {
+    const { client } = setup(t);
+    const beginResult = deferred();
+    const a = client(1, { beginResult });
+    await a.c.loading;
+    const pending = a.c.begin('A');
+    await flush();
+    await a.advance(8000);
+    assert.equal(a.c.active, false);
+    beginResult.resolve({ success: true });
+    await flush();
+    await a.advance(0);
+    assert.equal(await pending, true);
+});
+
+test('denied permission releases the temporary microphone without starting discovery', async (t) => {
+    const { client } = setup(t);
+    const geo = deferred();
+    const a = client(1, { geo });
+    const messages = [];
+    const pending = a.c.begin('A', message => messages.push(message));
+    geo.reject(Error('denied'));
+    assert.equal(await pending, false);
+    assert.equal(a.stopped, 1);
+    assert.equal(a.mesh.calls.length, 0);
+    assert.equal(a.c.active, false);
+    assert.match(messages.at(-1), /both needed/);
+});
+
+test('names exchange safely; binary files and links travel both ways only after consent', async (t) => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2);
+    await start(a, 'A'); await start(b, '<b>B</b>');
+    match(a, b); await flush();
+    assert.equal(a.c.devices.get(2).name, '<b>B</b>');
+    assert.equal(a.element('nearby-devices').children[0].children[0].textContent, '<b>B</b>');
+    a.c.selectDevice(2);
+    const bytes = Uint8Array.from({ length: 70000 }, (_, i) => i % 251);
+    const pending = a.window.parachuteSharing.transport.send({ files: [new File([bytes], 'test.bin')], sender: 'A' });
+    await flush();
+    assert.equal(b.window.parachuteSharing.transport.incoming.accepted, false);
+    assert.equal(a.mesh.calls.some(c => c.type === 'binary'), false);
+    b.window.parachuteSharing.transport.accept();
+    await pending;
+    const result = b.window.parachuteSharing.results[0];
+    assert.deepEqual(new Uint8Array(await result.files[0].arrayBuffer()), bytes);
+    assert.equal(a.mesh.calls.filter(c => c.type === 'binary').length, 2);
+    assert.equal(a.mesh.calls.filter(c => c.type === 'message').some(c => c.msg.bytes), false);
+    a.window.parachuteSharing.autoAccept = true;
+    await b.window.parachuteSharing.transport.send({ url: 'https://example.com/', sender: 'B' });
+    assert.equal(a.window.parachuteSharing.results[0].url, 'https://example.com/');
+});
+
+test('unmatched senders are ignored, busy recipients decline, and lost peers disable sharing', async (t) => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2), c = client(3);
+    await start(a, 'A'); await start(b, 'B'); await start(c, 'C');
+    a.c.receiveMessage({ from: 99, msg: { version: 2, type: 'offer', id: 'unknown' } });
+    assert.equal(a.c.channel, null);
+    match(a, b); match(a, c); await flush();
+    a.c.selectDevice(2);
+    a.window.parachuteSharing.transport.incoming = { id: 'busy' };
+    a.c.receiveMessage({ from: 3, msg: { version: 2, type: 'offer', id: 'other' } });
+    assert.equal(a.c.channel.peer, 2);
+    assert.equal(a.mesh.calls.at(-1).msg.type, 'decline');
+    a.mesh.peers = [3]; a.mesh.emit('peerRemoved', { uid: 2 });
+    assert.equal(a.c.channel, null);
     assert.equal(a.c.send.disabled, true);
 });
 
-test('both people clicking Connect converge on one connection', async (t) => {
-    const s = setup();
-    t.after(s.close);
-    const a = s.client(),
-        b = s.client();
-    await tick();
-    a.c.remote.value = b.c.local.value;
-    b.c.remote.value = a.c.local.value;
-    a.c.connectToPeer();
-    b.c.connectToPeer();
-    await tick();
-    await tick();
-    assert.equal(a.c.channel?.open, true);
-    assert.equal(b.c.channel?.open, true);
-    assert.equal(a.c.channel.other, b.c.channel);
-    a.c.channel.send({ version: 2, type: 'offer', id: 'test' });
-    await tick();
-    assert.equal(b.packets[0].id, 'test');
+test('service failure and disconnect during warmup never enable sharing; stop reloads', async (t) => {
+    const { client } = setup(t);
+    const offline = client(9, { loadFailure: true });
+    assert.equal(await offline.c.loading, false);
+    const a = client(1);
+    await a.c.loading;
+    const pending = a.c.begin('A');
+    await flush();
+    a.mesh.connected = false; a.mesh.emit('disconnected');
+    await a.advance(5000);
+    assert.equal(await pending, false);
+    assert.equal(a.c.active, false);
+    assert.equal(a.c.send.disabled, true);
+    a.c.stopDiscovery();
+    assert.equal(a.reloads, 1);
 });
 
-test('case-sensitive IDs are kept intact; old peer events do not affect a retry', async (t) => {
-    const s = setup();
-    t.after(s.close);
-    const a = s.client(),
-        b = s.client();
-    await tick();
-    const oldPeer = a.c.peer;
-    a.c.remote.value = b.c.local.value.toLowerCase();
-    a.c.connectToPeer();
-    await tick();
-    await tick();
-    assert.match(a.c.message.textContent, /Peer not found/);
-    a.c.start();
-    await tick();
-    const id = a.c.local.value;
-    oldPeer.emit('disconnected');
-    oldPeer.emit('error', { type: 'network' });
-    assert.equal(a.c.ready, true);
-    assert.equal(a.c.local.value, id);
-    a.c.remote.value = b.c.local.value;
-    a.c.connectToPeer();
-    await tick();
-    await tick();
-    assert.equal(a.c.state.textContent, 'Connected');
+test('a failed mesh relay aborts the pending transfer and disables sharing', async (t) => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2);
+    await start(a, 'A'); await start(b, 'B');
+    match(a, b); await flush();
+    a.c.selectDevice(2);
+    a.mesh.relayMessage = async () => { throw Error('relay offline'); };
+    await assert.rejects(a.window.parachuteSharing.transport.send({ url: 'https://example.com/' }), /Connection closed/);
+    assert.equal(a.c.channel, null);
+    assert.equal(a.c.send.disabled, true);
+    assert.match(a.c.message.textContent, /relay offline/);
 });

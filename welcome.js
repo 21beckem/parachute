@@ -7,6 +7,12 @@
     const wordmark = document.querySelector('.wordmark');
     const tools = document.querySelector('.header-tools');
     const main = document.querySelector('main');
+    const button = document.getElementById('welcome-connect');
+    const status = document.getElementById('welcome-status');
+    const reload = document.getElementById('welcome-reload');
+    reload.addEventListener('click', () => window.parachuteConnection.stopDiscovery());
+    let starting = false;
+    window.addEventListener('discovery-error', (event) => { status.textContent = event.detail; });
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
     try {
@@ -38,7 +44,7 @@
     window.addEventListener('resize', positionTitle);
     input.addEventListener('input', () => input.setCustomValidity(''));
 
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const displayName = input.value.trim();
         if (!displayName) {
@@ -46,9 +52,19 @@
             input.reportValidity();
             return;
         }
-        if (body.classList.contains('has-entered')) return;
-        // Keep the display name separate from the technical PeerJS page ID.
-        window.parachuteProfile = { displayName };
+        if (starting || body.classList.contains('has-entered')) return;
+        starting = true;
+        reload.hidden = false;
+        button.disabled = input.disabled = true;
+        button.textContent = 'Connecting…';
+        const connected = await window.parachuteConnection.begin(displayName, (message) => {
+            status.textContent = message;
+        });
+        starting = false;
+        button.disabled = input.disabled = false;
+        button.textContent = 'Connect';
+        if (!connected) return;
+        reload.hidden = true;
         try {
             sessionStorage.setItem('parachute.displayName', displayName);
         } catch {
@@ -61,7 +77,7 @@
         input.blur();
         welcome.inert = true;
         body.classList.add('has-entered');
-        // Connect only enters the sharing scene; nearby permissions come later.
+        // Discovery is ready and the five-second permission window has ended.
         setTimeout(
             () => {
                 welcome.hidden = true;
