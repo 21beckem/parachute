@@ -68,26 +68,27 @@ reconnection. Save received files before stopping or reloading.
 
 ## Hosted MeshClient
 
-`connection.js` imports only
-`/mesh-runtime/durable-object-server/mesh/mesh-client.js`. Its dependencies load
-automatically. `server.cjs` streams the modules, audio worker/worklet, model JSON,
-and WASM from the repository's live GitHub Pages site. No detection code or model
-is copied into this checkout, and no detection server is deployed. Assets have a
-60-second memory cache; reload after upstream changes. NoSleep is loaded from the
-same CDN used by the upstream demo.
+`mesh-loader.js` imports the live `mesh-client.js` from the detector's GitHub
+Pages repository when Parachute is opened on `https://21beckem.github.io`.
+The detector's GitHub URL redirects to its custom domain. A small local worker
+bootstrap imports the hosted audio worker so the browser's worker-origin rule
+is satisfied. The real analyzer modules, model JSON, WASM, and microphone
+worklet continue loading from the detector host; none are copied here.
+GitHub Pages needs no Node server and no `/mesh-runtime/` route. The default hosted
+WebSocket server remains the source of truth. NoSleep uses the upstream demo's CDN.
 
-The asset bridge is required because browser workers must be created from this
-website's origin. It changes only the upstream `isHostedLocally` flag to `false`
-so localhost uses the default hosted WebSocket server defined by MeshClient,
-rather than expecting a separate detector on port 8787. The server address stays
-in the upstream module. Other detection and protocol code is served unchanged.
-If that module's local-host setting changes shape, the bridge returns an error
-instead of silently connecting to a wrong endpoint.
+For local development and other Node hosts, the loader uses the existing
+`server.cjs` asset bridge. That bridge changes only the upstream
+`isHostedLocally` flag to `false` so localhost uses the default hosted detector
+rather than port 8787. Assets have a 60-second memory cache. Other static hosts
+need the same origin as the detector or an equivalent asset bridge.
 
-Run this Node server in production as well: plain static hosting does not provide
-`/mesh-runtime/`. Microphone and location access require HTTPS (localhost is the
-local-development exception). An internet connection and the upstream hosted
-service are required.
+Microphone and location access require HTTPS (localhost is the development
+exception). An internet connection and the upstream hosted service are required.
+The welcome screen shows when the scanner is ready or could not load. A startup
+failure restores the Connect button and offers a reload, rather than leaving
+it disabled. Camera descent still follows successful discovery startup and the
+five-second window after both permissions succeed.
 
 Discovery compares ambient room sound, not emitted tones. Audio features are
 prepared locally and sent to the detector for matching. Display names are
