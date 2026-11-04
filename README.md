@@ -70,10 +70,11 @@ reconnection. Save received files before stopping or reloading.
 
 `mesh-loader.js` imports the live `mesh-client.js` from the detector's GitHub
 Pages repository when Parachute is opened on `https://21beckem.github.io`.
-Both repositories share that browser origin, so the audio worker, modules,
-model JSON, WASM, and microphone worklet load directly from the detector repo.
-GitHub Pages needs no Node server and no `/mesh-runtime/` route. No detection
-code or model is copied into this checkout, and the detector's default hosted
+The detector's GitHub URL redirects to its custom domain. A small local worker
+bootstrap imports the hosted audio worker so the browser's worker-origin rule
+is satisfied. The real analyzer modules, model JSON, WASM, and microphone
+worklet continue loading from the detector host; none are copied here.
+GitHub Pages needs no Node server and no `/mesh-runtime/` route. The default hosted
 WebSocket server remains the source of truth. NoSleep uses the upstream demo's CDN.
 
 For local development and other Node hosts, the loader uses the existing
