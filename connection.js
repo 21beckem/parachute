@@ -1,5 +1,4 @@
 // Only MeshClient is imported. Its modules, worker, and model load automatically.
-const MESH_CLIENT_URL = '/mesh-runtime/durable-object-server/mesh/mesh-client.js';
 const IDENTITY = 'parachute:identity:v1';
 const WARMUP_MS = 5000;
 
@@ -56,7 +55,7 @@ class ParachuteConnection {
 
     async initialize() {
         try {
-            const { MeshClient } = await this.withTimeout(import(MESH_CLIENT_URL));
+            const { MeshClient } = await this.withTimeout(window.loadParachuteMesh());
             this.mesh = MeshClient;
             this.listen('initialized', () => { this.initialized = true; });
             this.listen('initError', ({ error }) => { this.initError = error; });
@@ -87,11 +86,15 @@ class ParachuteConnection {
             await this.withTimeout(this.mesh.init());
             if (!this.initialized || !this.mesh.connected)
                 throw this.initError || Error('The discovery server could not connect.');
+            window.dispatchEvent(new CustomEvent('discovery-initialized'));
             return true;
         } catch (error) {
             this.loadError = error;
             this.mesh?.disconnect();
             this.render('Nearby discovery could not load. Check your connection and reload.');
+            window.dispatchEvent(new CustomEvent('discovery-error', {
+                detail: 'The nearby scanner could not load. Reload the page to try again.'
+            }));
             return false;
         }
     }
@@ -133,7 +136,7 @@ class ParachuteConnection {
             if (!current()) throw Error('Discovery stopped. Reload to reconnect.');
             permissionStream.getTracks().forEach((track) => track.stop());
             permissionStream = null;
-            const result = await this.mesh.begin();
+            const result = await this.withTimeout(this.mesh.begin());
             if (!result?.success || !this.mesh.connected) throw Error('The scanner could not start. Reload and try again.');
             await new Promise((resolve) => setTimeout(resolve, Math.max(0, WARMUP_MS - (Date.now() - permissionsAcceptedAt))));
             if (!current() || !this.mesh.connected) throw Error('Discovery stopped. Reload to reconnect.');

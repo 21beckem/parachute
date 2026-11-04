@@ -13,6 +13,9 @@
     reload.addEventListener('click', () => window.parachuteConnection.stopDiscovery());
     let starting = false;
     window.addEventListener('discovery-error', (event) => { status.textContent = event.detail; });
+    window.addEventListener('discovery-initialized', () => {
+        if (!starting) status.textContent = 'Scanner ready. Enter your name and click Connect.';
+    });
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
     try {
@@ -57,12 +60,18 @@
         reload.hidden = false;
         button.disabled = input.disabled = true;
         button.textContent = 'Connecting…';
-        const connected = await window.parachuteConnection.begin(displayName, (message) => {
-            status.textContent = message;
-        });
-        starting = false;
-        button.disabled = input.disabled = false;
-        button.textContent = 'Connect';
+        let connected = false;
+        try {
+            connected = await window.parachuteConnection.begin(displayName, (message) => {
+                status.textContent = message;
+            });
+        } catch (error) {
+            status.textContent = error.message || 'The scanner could not start. Reload to retry.';
+        } finally {
+            starting = false;
+            button.disabled = input.disabled = false;
+            button.textContent = 'Connect';
+        }
         if (!connected) return;
         reload.hidden = true;
         try {

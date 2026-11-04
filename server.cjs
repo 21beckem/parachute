@@ -11,6 +11,7 @@ const assets = new Map([
     ['/background.css', ['background.css', 'text/css']],
     ['/parachute.js', ['parachute.js', 'text/javascript']],
     ['/connection.js', ['connection.js', 'text/javascript']],
+    ['/mesh-loader.js', ['mesh-loader.js', 'text/javascript']],
     ['/welcome.js', ['welcome.js', 'text/javascript']],
     ['/transfer.js', ['transfer.js', 'text/javascript']],
     ['/sharing.js', ['sharing.js', 'text/javascript']],

@@ -7,7 +7,7 @@ const { webcrypto } = require('node:crypto');
 const path = require('node:path');
 // Substitute only the network import; exercise the real controller and transfer protocol.
 const source = fs.readFileSync(path.join(__dirname, '../connection.js'), 'utf8')
-    .replace('import(MESH_CLIENT_URL)', 'window.loadMesh()');
+    .replace('window.loadParachuteMesh()', 'window.loadMesh()');
 const transferSource = fs.readFileSync(path.join(__dirname, '../transfer.js'), 'utf8');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };

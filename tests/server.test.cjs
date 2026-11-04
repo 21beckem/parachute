@@ -25,6 +25,7 @@ test('serves nearby discovery and sharing without loading PeerJS in the app', as
         'background.css',
         'parachute.js',
         'connection.js',
+        'mesh-loader.js',
         'welcome.js',
         'transfer.js',
         'sharing.js',
