@@ -7,8 +7,10 @@ const { networkInterfaces } = require('node:os');
 const assets = new Map([
     ['/', ['index.html', 'text/html']],
     ['/index.html', ['index.html', 'text/html']],
+    ['/about.html', ['about.html', 'text/html']],
     ['/style.css', ['style.css', 'text/css']],
     ['/background.css', ['background.css', 'text/css']],
+    ['/about.css', ['about.css', 'text/css']],
     ['/parachute.js', ['parachute.js', 'text/javascript']],
     ['/connection.js', ['connection.js', 'text/javascript']],
     ['/welcome.js', ['welcome.js', 'text/javascript']],

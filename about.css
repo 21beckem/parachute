@@ -1,0 +1,188 @@
+/* The About page uses the shared scene and branding with a scrolling content layout. */
+html {
+    height: auto;
+    overflow: auto;
+}
+
+.about-page {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+}
+
+.about-page .scenery {
+    position: fixed;
+    height: 100vh;
+    height: 100dvh;
+    transform: none;
+}
+
+.about-page .site-header {
+    max-width: 1120px;
+    margin: 0 auto;
+    flex-wrap: wrap;
+}
+
+.about-home-link {
+    display: inline-block;
+    padding: 11px 16px;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    background: #ffd779;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 0 #293d5233;
+}
+
+.about-home-link:hover {
+    background: #ffe7a7;
+}
+
+.about-page a:focus-visible {
+    outline: 3px solid #ffe4a1;
+    outline-offset: 4px;
+}
+
+.about-main {
+    display: grid;
+    gap: 22px;
+    width: min(900px, calc(100% - 32px));
+    min-height: 0;
+    margin: 12px auto 64px;
+}
+
+.about-intro,
+.about-card {
+    padding: clamp(22px, 4vw, 38px);
+    border: 3px solid var(--ink);
+    border-radius: 22px;
+    background: #fffaf0f2;
+    box-shadow: 0 8px 0 #293d5233;
+}
+
+.about-intro {
+    background: #fffaf0f5;
+}
+
+.about-eyebrow {
+    margin: 0 0 8px;
+    color: #275b8c;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.about-main h1,
+.about-main h2 {
+    margin: 0 0 14px;
+    line-height: 1.15;
+}
+
+.about-main h1 {
+    font-size: clamp(32px, 5vw, 52px);
+}
+
+.about-main h2 {
+    font-size: clamp(24px, 3vw, 30px);
+}
+
+.about-main p,
+.about-main li {
+    line-height: 1.6;
+}
+
+.about-intro > p:last-child {
+    max-width: 62ch;
+    margin-bottom: 0;
+    font-size: 18px;
+}
+
+.about-steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: steps;
+}
+
+.about-steps li {
+    position: relative;
+    padding: 18px 18px 18px 57px;
+    border: 2px solid #293d5233;
+    border-radius: 14px;
+    background: #fffdf7;
+    counter-increment: steps;
+}
+
+.about-steps li::before {
+    position: absolute;
+    top: 16px;
+    left: 15px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #ffd779;
+    content: counter(steps);
+    font-weight: bold;
+}
+
+.about-steps strong {
+    display: block;
+    margin-bottom: 3px;
+}
+
+.about-note {
+    margin: 0;
+    padding: 13px 16px;
+    border-left: 5px solid #ee7667;
+    background: #ffe9cf;
+    font-size: 14px;
+}
+
+.team-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.team-list li {
+    padding: 13px 16px;
+    border: 2px solid #293d5233;
+    border-radius: 12px;
+    background: #fffdf7;
+    font-weight: bold;
+}
+
+@media (max-width: 640px) {
+    .about-page .site-header {
+        align-items: center;
+    }
+
+    .about-page .site-header nav {
+        margin-left: auto;
+    }
+
+    .about-main {
+        margin-top: 0;
+    }
+
+    .about-steps,
+    .team-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .about-intro > p:last-child {
+        font-size: 16px;
+    }
+}

@@ -134,6 +134,19 @@ a {
     border-top: 1px solid #ffffff40;
     padding-top: 19px;
 }
+.welcome-about-link {
+    display: inline-block;
+    padding: 4px 0;
+    color: #fffdf4;
+    font-size: 14px;
+    font-weight: bold;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.welcome-about-link:focus-visible {
+    outline: 3px solid #ffe4a1;
+    outline-offset: 3px;
+}
 .wordmark {
     transform-origin: top left;
 }
@@ -490,6 +503,31 @@ main {
 }
 
 /* Footer */
+
+.site-footer {
+    display: none;
+    position: relative;
+    z-index: 4;
+    padding: 9px 4% 12px;
+    background: #315777;
+    color: #fffdf4;
+    text-align: right;
+    font-size: 13px;
+}
+.has-entered {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.has-entered .site-footer {
+    display: block;
+}
+.site-footer a {
+    font-weight: bold;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.new-tab-note {
+    font-weight: normal;
+}
 
 a:focus-visible {
     outline: 3px solid var(--cream);
