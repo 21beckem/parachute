@@ -17,6 +17,7 @@ function setup(t) {
     function client(uid, { audio, geo, beginResult, loadFailure } = {}) {
         const events = [], elements = new Map(), timers = new Map();
         let now = 0, timerId = 0, stopped = 0, reloads = 0;
+        const permissionCalls = { audio: 0, location: 0, locationOptions: null };
         const stream = { getTracks: () => [{ stop: () => stopped++ }] };
         const panel = { dataset: {}, contains: () => false, querySelector: () => ({ focus() {} }) };
         function element(id) {
@@ -36,7 +37,23 @@ function setup(t) {
             on(event, callback) { emitter.on(event, callback); return () => emitter.off(event, callback); },
             emit: (...args) => emitter.emit(...args),
             async init() { this.connected = true; this.emit('initialized'); },
-            async begin() { this.calls.push('begin'); return beginResult ? beginResult.promise : { success: true }; },
+            async begin() {
+                this.calls.push('begin');
+                const results = await Promise.allSettled([
+                    context.navigator.mediaDevices.getUserMedia({ audio: true }),
+                    new Promise((resolve, reject) => context.navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+                    }))
+                ]);
+                for (let i = 0; i < results.length; i++) {
+                    if (results[i].status === 'rejected') {
+                        const stage = i === 0 ? 'audio' : 'location';
+                        this.emit('startError', { stage, result: { error: results[i].reason } });
+                        throw Error(`Failed to begin ${stage} stream: [object GeolocationPositionError]`);
+                    }
+                }
+                return beginResult ? beginResult.promise : { success: true };
+            },
             async relayMessage(to, msg) {
                 this.calls.push({ type: 'message', to, msg });
                 await new Promise(setImmediate);
@@ -71,8 +88,15 @@ function setup(t) {
         const context = {
             window, document: { getElementById: element, createElement: () => element(Symbol()), addEventListener() {} },
             navigator: {
-                mediaDevices: { getUserMedia: () => audio ? audio.promise : Promise.resolve(stream) },
-                geolocation: { getCurrentPosition: (resolve, reject) => geo ? geo.promise.then(resolve, reject) : resolve({ coords: {} }) }
+                mediaDevices: { getUserMedia: () => {
+                    permissionCalls.audio++;
+                    return audio ? audio.promise : Promise.resolve(stream);
+                } },
+                geolocation: { getCurrentPosition: (resolve, reject, options) => {
+                    permissionCalls.location++;
+                    permissionCalls.locationOptions = options;
+                    return geo ? geo.promise.then(resolve, reject) : resolve({ coords: {} });
+                } }
             },
             location: { reload: () => reloads++ },
             CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
@@ -83,7 +107,8 @@ function setup(t) {
         vm.runInNewContext(transferSource, context);
         vm.runInNewContext(source, context);
         const result = {
-            c: window.parachuteConnection, window, mesh, events, elements, element,
+            c: window.parachuteConnection, window, mesh, events, elements, element, permissionCalls,
+            browserAPIs: context.navigator,
             get stopped() { return stopped; }, get reloads() { return reloads; },
             async advance(ms) {
                 now += ms;
@@ -118,7 +143,7 @@ test('both permissions must succeed before the five-second selection window star
     audio.resolve({ getTracks: () => [{ stop() {} }] });
     await a.advance(10000);
     assert.equal(a.events.some(e => e.type === 'discovery-warmup-start'), false);
-    assert.equal(a.mesh.calls.length, 0);
+    assert.equal(a.mesh.calls.length, 1);
     geo.resolve({ coords: {} });
     await flush();
     assert.equal(a.events.find(e => e.type === 'discovery-warmup-start').at, 10000);
@@ -129,6 +154,8 @@ test('both permissions must succeed before the five-second selection window star
     await a.advance(1);
     assert.equal(await pending, true);
     assert.equal(a.c.active, true);
+    assert.equal(a.permissionCalls.audio, 1, 'only MeshClient requests the microphone');
+    assert.equal(a.permissionCalls.location, 1, 'only MeshClient requests location');
 });
 
 test('a slow analyzer keeps selection locked beyond five seconds', async (t) => {
@@ -146,18 +173,39 @@ test('a slow analyzer keeps selection locked beyond five seconds', async (t) => 
     assert.equal(await pending, true);
 });
 
-test('denied permission releases the temporary microphone without starting discovery', async (t) => {
+test('denied location releases the scanner microphone and explains the actual error', async (t) => {
+    const { client } = setup(t);
+    const geo = deferred();
+    const a = client(1, { geo });
+    const nativeAudio = a.browserAPIs.mediaDevices.getUserMedia;
+    const nativeLocation = a.browserAPIs.geolocation.getCurrentPosition;
+    const messages = [];
+    const pending = a.c.begin('A', message => messages.push(message));
+    geo.reject({ code: 1, message: 'User denied geolocation' });
+    assert.equal(await pending, false);
+    assert.equal(a.stopped, 1);
+    assert.equal(a.mesh.calls.length, 1);
+    assert.equal(a.c.active, false);
+    assert.match(messages.at(-1), /Location access is blocked/);
+    assert.equal(a.browserAPIs.mediaDevices.getUserMedia, nativeAudio);
+    assert.equal(a.browserAPIs.geolocation.getCurrentPosition, nativeLocation);
+});
+
+test('location timeouts allow a recent fix and show a useful retry message', async (t) => {
     const { client } = setup(t);
     const geo = deferred();
     const a = client(1, { geo });
     const messages = [];
     const pending = a.c.begin('A', message => messages.push(message));
-    geo.reject(Error('denied'));
+    await flush();
+    assert.equal(a.permissionCalls.locationOptions.timeout, 30000);
+    assert.equal(a.permissionCalls.locationOptions.maximumAge, 60000);
+    assert.equal(a.permissionCalls.locationOptions.enableHighAccuracy, true);
+    geo.reject({ code: 3, message: 'Timeout expired' });
     assert.equal(await pending, false);
+    assert.match(messages.at(-1), /Finding your location timed out/);
+    assert.doesNotMatch(messages.at(-1), /\[object/);
     assert.equal(a.stopped, 1);
-    assert.equal(a.mesh.calls.length, 0);
-    assert.equal(a.c.active, false);
-    assert.match(messages.at(-1), /both needed/);
 });
 
 test('names exchange safely; binary files and links travel both ways only after consent', async (t) => {

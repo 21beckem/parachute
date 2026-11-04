@@ -90,6 +90,12 @@ failure restores the Connect button and offers a reload, rather than leaving
 it disabled. Camera descent still follows successful discovery startup and the
 five-second window after both permissions succeed.
 
+MeshClient makes the microphone and location requests itself; Parachute observes
+those same requests to time the five-second window. It does not request either
+sensor a second time. Location gets up to 30 seconds and can use a position from
+the last 60 seconds. A failed lookup distinguishes blocked access, unavailable
+location, and timeout. Failed startup releases the captured microphone tracks.
+
 Discovery compares ambient room sound, not emitted tones. Audio features are
 prepared locally and sent to the detector for matching. Display names are
 exchanged with matched devices through `relayMessage()`. JSON transfer messages
@@ -148,6 +154,11 @@ For a browser-only UI check, run `node tests/mesh-preview.cjs` and open
 `http://localhost:3001` in two tabs. This fixture uses fake permissions and a
 simulated mesh, so it does not access the microphone or location or test the
 real detector. The normal website at port 3000 always uses the hosted module.
+
+To exercise the real hosted detector and audio/WASM pipeline, run
+`node tests/detector-preview.cjs` and open `http://localhost:3002`. It uses generated
+sound and a test position at 0,0, which are sent to the hosted detector; it does
+not access real sensors. Add `?location-timeout=1` to test the location-error UI.
 
 ## Animation API
 

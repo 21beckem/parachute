@@ -44,11 +44,11 @@ class ParachuteConnection {
         this.unsubscribers.push(this.mesh.on(event, callback));
     }
 
-    async withTimeout(promise) {
+    async withTimeout(promise, timeoutMs = 30000) {
         let timer;
         try {
             return await Promise.race([promise, new Promise((_, reject) => {
-                timer = setTimeout(() => reject(Error('The discovery service timed out. Reload to retry.')), 30000);
+                timer = setTimeout(() => reject(Error('The discovery service timed out. Reload to retry.')), timeoutMs);
             })]);
         } finally { clearTimeout(timer); }
     }
@@ -59,6 +59,9 @@ class ParachuteConnection {
             this.mesh = MeshClient;
             this.listen('initialized', () => { this.initialized = true; });
             this.listen('initError', ({ error }) => { this.initError = error; });
+            this.listen('startError', ({ stage, error, result }) => {
+                this.startFailure = { stage, error: result?.error || error };
+            });
             this.listen('peerAdded', ({ uid }) => {
                 if (this.active) this.identify(uid);
                 this.render();
@@ -105,40 +108,62 @@ class ParachuteConnection {
         this.starting = true;
         const generation = this.generation;
         const current = () => generation === this.generation;
-        let permissionStream;
-        try {
-            if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !navigator.geolocation)
-                throw Error('Microphone and location access need HTTPS or localhost in a supported browser.');
-            onStatus('Allow microphone and location access to find nearby devices.');
-            // Request both on Connect. Do not start the five-second window until
-            // both have actually succeeded. MeshClient owns the lasting mic stream.
-            const permissions = await Promise.allSettled([
-                navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-                    permissionStream = stream;
-                    return stream;
-                }),
-                new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true, timeout: 20000, maximumAge: 0
-                }))
-            ]);
-            const denied = permissions.find((result) => result.status === 'rejected');
-            if (denied) throw Error('Microphone and location are both needed. Allow them in your browser and try again.');
-            if (!current()) throw Error('Discovery stopped. Reload to reconnect.');
-            window.parachuteProfile = { displayName };
-            const permissionsAcceptedAt = Date.now();
+        const media = navigator.mediaDevices;
+        const geo = navigator.geolocation;
+        const getAudio = media?.getUserMedia;
+        const getLocation = geo?.getCurrentPosition;
+        const streams = new Set();
+        let wrappedAudio, wrappedLocation;
+        let finished = false, succeeded = false;
+        let audioAccepted = false, locationAccepted = !!this.locationAccepted;
+        let permissionsAcceptedAt = null;
+        this.startFailure = null;
+        const permissionsReady = () => {
+            if (finished || !current() || !audioAccepted || !locationAccepted || permissionsAcceptedAt !== null) return;
+            permissionsAcceptedAt = Date.now();
             this.permissionsAcceptedAt = permissionsAcceptedAt;
             onStatus('Permissions accepted. Getting five seconds of room sound…');
-            // Future animation hook. The matching end event fires only when the
-            // minimum window AND MeshClient readiness have both completed.
             window.dispatchEvent(new CustomEvent('discovery-warmup-start', {
                 detail: { durationMs: WARMUP_MS, startedAt: permissionsAcceptedAt }
             }));
+        };
+        try {
+            if (!window.isSecureContext || !getAudio || !getLocation)
+                throw Error('Microphone and location access need HTTPS or localhost in a supported browser.');
             if (!(await this.loading)) throw this.loadError || Error('The discovery service could not load. Reload to retry.');
             if (!current()) throw Error('Discovery stopped. Reload to reconnect.');
-            permissionStream.getTracks().forEach((track) => track.stop());
-            permissionStream = null;
-            const result = await this.withTimeout(this.mesh.begin());
+            window.parachuteProfile = { displayName };
+            onStatus('Allow microphone and location access to find nearby devices.');
+            // Observe MeshClient's own requests instead of making a second set.
+            // Keep the native callbacks and constraints; only allow more time
+            // for location and accept a recent position on slow desktop providers.
+            wrappedAudio = (constraints) => getAudio.call(media, constraints).then((stream) => {
+                if (finished) stream.getTracks().forEach((track) => track.stop());
+                else {
+                    streams.add(stream);
+                    audioAccepted = true;
+                    permissionsReady();
+                }
+                return stream;
+            });
+            wrappedLocation = (success, failure, options) => getLocation.call(geo, (position) => {
+                if (!finished && current()) {
+                    this.locationAccepted = locationAccepted = true;
+                    permissionsReady();
+                }
+                success(position);
+            }, (error) => {
+                if (!finished) this.startFailure = { stage: 'location', error };
+                failure?.(error);
+            }, { ...options, timeout: 30000, maximumAge: 60000 });
+            media.getUserMedia = wrappedAudio;
+            geo.getCurrentPosition = wrappedLocation;
+            const result = await this.withTimeout(this.mesh.begin(), 45000);
             if (!result?.success || !this.mesh.connected) throw Error('The scanner could not start. Reload and try again.');
+            // Cached upstream location or a browser with non-writable methods
+            // may not call the observers. Successful begin still confirms both.
+            audioAccepted = locationAccepted = true;
+            permissionsReady();
             await new Promise((resolve) => setTimeout(resolve, Math.max(0, WARMUP_MS - (Date.now() - permissionsAcceptedAt))));
             if (!current() || !this.mesh.connected) throw Error('Discovery stopped. Reload to reconnect.');
             this.ready = this.active = true;
@@ -146,15 +171,35 @@ class ParachuteConnection {
             for (const uid of this.mesh.peers) this.identify(uid);
             this.panel.open = true;
             this.render();
+            succeeded = true;
             return true;
         } catch (error) {
-            onStatus(error.message || 'Discovery could not start. Check your permissions and retry.');
-            window.dispatchEvent(new CustomEvent('discovery-warmup-error', { detail: error.message }));
+            const message = this.startErrorMessage(error);
+            onStatus(message);
+            window.dispatchEvent(new CustomEvent('discovery-warmup-error', { detail: message }));
             return false;
         } finally {
-            permissionStream?.getTracks().forEach((track) => track.stop());
+            finished = true;
+            if (media && wrappedAudio && media.getUserMedia === wrappedAudio) media.getUserMedia = getAudio;
+            if (geo && wrappedLocation && geo.getCurrentPosition === wrappedLocation) geo.getCurrentPosition = getLocation;
+            if (!succeeded) for (const stream of streams) stream.getTracks().forEach((track) => track.stop());
             this.starting = false;
         }
+    }
+
+    startErrorMessage(error) {
+        const failure = this.startFailure;
+        if (failure?.stage === 'location') {
+            if (failure.error?.code === 1) return 'Location access is blocked. Allow Location for this website and in your device settings, then try again.';
+            if (failure.error?.code === 2) return 'Your device could not find its location. Check that Location services are on, then try again.';
+            if (failure.error?.code === 3) return 'Finding your location timed out. Check Location services and keep this page open while you try again.';
+            return 'Location could not start. Check Location services and this website’s location permission, then try again.';
+        }
+        if (failure?.stage === 'audio') {
+            if (failure.error?.name === 'NotAllowedError') return 'Microphone access is blocked. Allow the microphone for this website and in your device settings, then try again.';
+            return `The microphone could not start: ${failure.error?.message || 'check your microphone and try again'}.`;
+        }
+        return error.message || 'Discovery could not start. Check your permissions and retry.';
     }
 
     stopHandshake(uid) {
