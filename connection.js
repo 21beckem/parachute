@@ -90,10 +90,11 @@ class ParachuteConnection {
             return true;
         } catch (error) {
             this.loadError = error;
+            console.error('Parachute scanner initialization failed:', error);
             this.mesh?.disconnect();
             this.render('Nearby discovery could not load. Check your connection and reload.');
             window.dispatchEvent(new CustomEvent('discovery-error', {
-                detail: 'The nearby scanner could not load. Reload the page to try again.'
+                detail: `The nearby scanner could not load: ${error.message || 'Unknown connection error'}. Reload to try again.`
             }));
             return false;
         }
