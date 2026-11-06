@@ -68,6 +68,21 @@ class ParachuteConnection {
             });
             this.listen('peerRemoved', ({ uid }) => {
                 this.stopHandshake(uid);
+                const channel = this.channel;
+                const transport = window.parachuteSharing?.transport;
+                if (channel?.peer === uid && (transport?.outgoing || transport?.incoming)) {
+                    // A sound-match update is not proof that the relay socket
+                    // disconnected. Preserve this already-started transfer and
+                    // let a real relay failure or transfer timeout end it.
+                    void this.mesh.relayMessage(uid, { type: 'parachute:transfer-check:v1' }).catch(() => {
+                        if (this.channel === channel && !this.mesh.peers.includes(uid)) {
+                            this.devices.delete(uid);
+                            this.closeConnection('That device is no longer reachable. The transfer was stopped.');
+                        }
+                    });
+                    this.render();
+                    return;
+                }
                 this.devices.delete(uid);
                 if (this.channel?.peer === uid) this.closeConnection('That device left the nearby list.');
                 this.render();
@@ -242,7 +257,10 @@ class ParachuteConnection {
             this.render();
             return;
         }
-        if (!this.active || !this.mesh.peers.includes(from) || msg.version !== 2) return;
+        if (!this.active || msg.version !== 2) return;
+        // Once an offer has selected this peer, its replies remain valid even
+        // if the sound matcher temporarily removes it from the nearby list.
+        if (!this.mesh.peers.includes(from) && this.channel?.peer !== from) return;
         if (msg.type === 'offer' && this.channel?.peer !== from) {
             const transport = window.parachuteSharing?.transport;
             if (transport?.outgoing || transport?.incoming) {
@@ -255,7 +273,7 @@ class ParachuteConnection {
     }
 
     receiveBinary({ from, payload, meta }) {
-        if (!this.active || this.channel?.peer !== from || !this.mesh.peers.includes(from)
+        if (!this.active || this.channel?.peer !== from
             || meta?.version !== 2 || meta.type !== 'chunk' || !ArrayBuffer.isView(payload)) return;
         window.parachuteSharing?.transport?.receive({ ...meta, bytes: payload });
     }
@@ -308,11 +326,13 @@ class ParachuteConnection {
     }
 
     render(message) {
-        const ids = this.active ? this.mesh.peers : [];
+        const ids = this.active ? [...this.mesh.peers] : [];
+        const signalChanged = !!this.channel && !ids.includes(this.channel.peer);
+        if (this.active && signalChanged) ids.push(this.channel.peer);
         this.state.textContent = this.channel ? 'Ready to share' : this.active ? `Nearby devices (${ids.length})` : 'Not connected';
         this.panel.dataset.state = this.channel ? 'connected' : this.active ? 'ready' : 'offline';
         this.message.textContent = message || (this.channel
-            ? `Sharing with ${this.devices.get(this.channel.peer)?.name || 'a nearby device'}.`
+            ? `Sharing with ${this.devices.get(this.channel.peer)?.name || 'a nearby device'}.${signalChanged ? ' Room signal changed; keeping this sharing connection.' : ''}`
             : this.active ? 'Choose a nearby device to share files or a link.' : 'Click Connect to start nearby discovery.');
         this.list.replaceChildren();
         this.empty.hidden = ids.length > 0;
@@ -323,7 +343,7 @@ class ParachuteConnection {
             const selected = uid === this.channel?.peer;
             button.type = 'button';
             button.disabled = !this.devices.has(uid);
-            button.textContent = `${this.devices.get(uid)?.name || 'Identifying device…'}${selected ? ' · Selected' : ''}`;
+            button.textContent = `${this.devices.get(uid)?.name || 'Identifying device…'}${selected ? signalChanged ? ' · Selected (room signal changed)' : ' · Selected' : ''}`;
             button.setAttribute('aria-pressed', String(selected));
             button.addEventListener('click', () => this.selectDevice(uid));
             item.append(button);

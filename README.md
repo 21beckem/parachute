@@ -60,8 +60,12 @@ address cannot request microphone and location access in most browsers.
 
 The list can show several nearby devices; sharing targets one person at a time.
 Incoming offers from another matched device select that sender when you are idle.
-Other offers are declined while a transfer is pending or active. A lost match or
-server disconnection cancels the selected session. **Clear selection** leaves
+Other offers are declined while a transfer is pending or active. If a room match
+disappears during an offer or transfer, Parachute keeps that selected sharing
+connection and checks whether the relay can still reach the recipient. Its row
+is marked "room signal changed"; detector results themselves are not changed.
+Actual relay failures, server disconnection, and transfer timeouts still stop
+the transfer. New devices must still be discovered before they can send offers. **Clear selection** leaves
 nearby discovery running. **Stop discovery** reloads the page to release the
 microphone, because the upstream singleton does not expose microphone cleanup or
 reconnection. Save received files before stopping or reloading.
@@ -217,3 +221,14 @@ the connection succeeds or is cancelled. `launchRocket()` only plays the launch
 animation; `sharing.js` starts it after the recipient accepts.
 
 Run controller and physics checks with `node --test tests/animation.test.cjs`.
+
+
+## Real relay regression check
+
+Run `node tests/relay-preview.cjs` and open `http://localhost:3003` in two tabs.
+This uses the real hosted MeshClient and JSON/binary relays, with generated audio,
+a test position, and controlled discovery notices. No real sensors are accessed.
+Choose a recipient and offer a file. Before accepting on the recipient, click
+**Hide test room match** in the sender's dialog. Accept the offer and check that
+the file arrives intact; send a link in the opposite direction and test Decline.
+The matching controls exist only in this local test harness.

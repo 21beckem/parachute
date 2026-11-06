@@ -244,9 +244,71 @@ test('unmatched senders are ignored, busy recipients decline, and lost peers dis
     a.c.receiveMessage({ from: 3, msg: { version: 2, type: 'offer', id: 'other' } });
     assert.equal(a.c.channel.peer, 2);
     assert.equal(a.mesh.calls.at(-1).msg.type, 'decline');
+    a.window.parachuteSharing.transport.incoming = null;
     a.mesh.peers = [3]; a.mesh.emit('peerRemoved', { uid: 2 });
     assert.equal(a.c.channel, null);
     assert.equal(a.c.send.disabled, true);
+});
+
+test('a room-match loss during a binary transfer preserves bytes, consent, and later links', async (t) => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2);
+    await start(a, 'A'); await start(b, 'B');
+    match(a, b); await flush();
+    a.c.selectDevice(2);
+    b.window.parachuteSharing.autoAccept = true;
+    const bytes = Uint8Array.from({ length: 150000 }, (_, i) => i % 251);
+    const gate = deferred();
+    let readingSecondChunk = false;
+    t.after(() => gate.resolve());
+    const file = {
+        name: 'room-change.bin', size: bytes.length, type: 'application/octet-stream',
+        slice(start, end) {
+            return { async arrayBuffer() {
+                if (start > 0) { readingSecondChunk = true; await gate.promise; }
+                return bytes.slice(start, end).buffer;
+            } };
+        }
+    };
+    const flight = a.window.parachuteSharing.transport.send({ files: [file], sender: 'A' });
+    for (let i = 0; i < 20 && !readingSecondChunk; i++) await flush();
+    assert.equal(readingSecondChunk, true);
+    const aChannel = a.c.channel, bChannel = b.c.channel;
+    a.mesh.peers = []; b.mesh.peers = [];
+    a.mesh.emit('peerRemoved', { uid: 2, score: 0.4 });
+    b.mesh.emit('peerRemoved', { uid: 1, score: 0.4 });
+    await flush();
+    assert.equal(a.c.channel, aChannel);
+    assert.equal(b.c.channel, bChannel);
+    assert.equal(a.mesh.peers.length, 0, 'the app must not invent a new sound match');
+    assert.match(a.c.message.textContent, /Room signal changed/);
+    gate.resolve();
+    await flight;
+    assert.deepEqual(new Uint8Array(await b.window.parachuteSharing.results[0].files[0].arrayBuffer()), bytes);
+    a.window.parachuteSharing.autoAccept = true;
+    await b.window.parachuteSharing.transport.send({ url: 'https://example.com/after-room-change', sender: 'B' });
+    assert.equal(a.window.parachuteSharing.results[0].url, 'https://example.com/after-room-change');
+    match(a, b); await flush();
+    assert.equal(a.c.channel, aChannel);
+    assert.doesNotMatch(a.c.message.textContent, /Room signal changed/);
+});
+
+test('an unreachable recipient after a room-match loss still aborts the pending transfer', async (t) => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2);
+    await start(a, 'A'); await start(b, 'B');
+    match(a, b); await flush();
+    a.c.selectDevice(2);
+    const flight = a.window.parachuteSharing.transport.send({ url: 'https://example.com/' });
+    const failure = assert.rejects(flight, /Connection closed/);
+    await flush();
+    a.mesh.relayMessage = async () => { throw Error('Unknown peer'); };
+    a.mesh.peers = [];
+    a.mesh.emit('peerRemoved', { uid: 2, score: 0 });
+    await failure;
+    assert.equal(a.c.channel, null);
+    assert.equal(a.c.send.disabled, true);
+    assert.match(a.c.message.textContent, /no longer reachable/);
 });
 
 test('service failure and disconnect during warmup never enable sharing; stop reloads', async (t) => {

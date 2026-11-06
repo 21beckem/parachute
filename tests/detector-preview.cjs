@@ -36,21 +36,32 @@ navigator.geolocation.getCurrentPosition = (success, failure, options) => {
 };
 window.addEventListener('pagehide', () => { for (const context of testContexts) void context.close(); });
 `;
-const server = createParachuteServer();
-const serve = server.listeners('request')[0];
-server.removeAllListeners('request');
-server.on('request', (req, res) => {
-    const url = new URL(req.url, 'http://localhost');
-    if (url.pathname === '/') {
-        res.setHeader('Content-Type', 'text/html');
-        return res.end(readFileSync(path.join(__dirname, '../index.html'), 'utf8')
-            .replace('<title>Parachute</title>', '<title>Parachute · real detector test</title><script src="/synthetic-sensors.js"></script>')
-            .replace('<body>', '<body><p style="position:fixed;bottom:0;right:0;z-index:20;background:white;color:black;margin:0;padding:4px;font-size:12px">Test: real detector, synthetic audio and location</p>'));
-    }
-    if (url.pathname === '/synthetic-sensors.js') {
-        res.setHeader('Content-Type', 'text/javascript');
-        return res.end(sensors);
-    }
-    return serve(req, res);
-});
-server.listen(3002, '127.0.0.1', () => console.log('Real detector with synthetic sensors: http://localhost:3002'));
+function createDetectorPreview({ relayTest = false } = {}) {
+    const server = createParachuteServer();
+    const serve = server.listeners('request')[0];
+    server.removeAllListeners('request');
+    server.on('request', (req, res) => {
+        const url = new URL(req.url, 'http://localhost');
+        if (url.pathname === '/') {
+            res.setHeader('Content-Type', 'text/html');
+            return res.end(readFileSync(path.join(__dirname, '../index.html'), 'utf8')
+                .replace('<title>Parachute</title>', '<title>Parachute · real detector test</title><script src="/synthetic-sensors.js"></script>')
+                .replace('<script src="connection.js', `${relayTest ? '<script src="/relay-discovery.js" defer></script>' : ''}<script src="connection.js`)
+                .replace('<body>', '<body><p style="position:fixed;bottom:0;right:0;z-index:20;background:white;color:black;margin:0;padding:4px;font-size:12px">Test: real detector, synthetic audio and location</p>'));
+        }
+        if (url.pathname === '/synthetic-sensors.js') {
+            res.setHeader('Content-Type', 'text/javascript');
+            return res.end(sensors);
+        }
+        if (relayTest && url.pathname === '/relay-discovery.js') {
+            res.setHeader('Content-Type', 'text/javascript');
+            return res.end(readFileSync(path.join(__dirname, 'relay-discovery.js')));
+        }
+        return serve(req, res);
+    });
+    return server;
+}
+module.exports = { createDetectorPreview };
+if (require.main === module) {
+    createDetectorPreview().listen(3002, '127.0.0.1', () => console.log('Real detector with synthetic sensors: http://localhost:3002'));
+}
