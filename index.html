@@ -10,14 +10,14 @@
         />
         <title>Parachute</title>
         <link rel="stylesheet" href="background.css" />
-        <link rel="stylesheet" href="style.css" />
-        <script src="parachute.js" defer></script>
+        <link rel="stylesheet" href="style.css?v=received-cards-1" />
+        <script src="parachute.js?v=broadcast-box-1" defer></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
-        <script src="transfer.js" defer></script>
-        <script src="mesh-loader.js?v=detector-startup-6" defer></script>
-        <script src="connection.js?v=detector-startup-6" defer></script>
-        <script src="welcome.js?v=detector-startup-6" defer></script>
-        <script src="sharing.js" defer></script>
+        <script src="transfer.js?v=broadcast-box-1" defer></script>
+        <script src="mesh-loader.js?v=broadcast-box-1" defer></script>
+        <script src="connection.js?v=broadcast-box-1" defer></script>
+        <script src="welcome.js?v=broadcast-box-1" defer></script>
+        <script src="sharing.js?v=received-cards-1" defer></script>
     </head>
     <body>
         <!-- Reusable artwork for the branding and draggable delivery. -->
@@ -302,7 +302,7 @@
                 <p>
                     Connect will ask for your microphone and location. We compare
                     room sound to find nearby devices. Please allow five seconds
-                    after both permissions are accepted before choosing a device.
+                    after both permissions are accepted before sharing nearby.
                 </p>
                 <a class="welcome-about-link" href="about.html">About Parachute</a>
             </div>
@@ -340,7 +340,6 @@
                         <ul id="nearby-devices" class="nearby-devices" aria-label="Nearby devices"></ul>
                         <p id="nearby-empty">Nearby devices will appear after you connect.</p>
                         <div class="connection-actions">
-                            <button id="disconnect-device" type="button" hidden>Clear selection</button>
                             <button id="stop-discovery" type="button" hidden>Stop discovery</button>
                             <button id="retry-discovery" type="button" hidden>Reload to reconnect</button>
                         </div>
@@ -348,8 +347,8 @@
                             Click Connect to find nearby people.
                         </p>
                         <p class="connection-note">
-                            Choose one person at a time. Keep both pages open while sharing.
-                            Files pass through the sharing service after the recipient accepts.
+                            Everyone currently nearby gets their own parachute. Put an incoming
+                            parachute in your box to receive it. Missed offers expire.
                         </p>
                     </div>
                 </details>
@@ -512,6 +511,7 @@
         <div class="transfer-tools">
             <button id="show-received" type="button">Received (0)</button>
             <p id="transfer-status" role="status" aria-live="polite" hidden></p>
+            <button id="cancel-transfer" type="button" hidden>Cancel send</button>
         </div>
 
         <dialog
@@ -556,25 +556,8 @@
                 <button id="send-link" type="submit">Send link</button>
             </form>
             <p id="share-feedback" role="status" aria-live="polite">
-                Your friend will be asked to accept before the transfer starts.
+                Everyone nearby gets a parachute. Transfers start when they put it in their box.
             </p>
-            <button id="cancel-transfer" type="button" hidden>
-                Cancel transfer
-            </button>
-        </dialog>
-
-        <dialog
-            id="incoming-dialog"
-            class="share-dialog"
-            aria-labelledby="incoming-title"
-        >
-            <h2 id="incoming-title">Incoming parachute</h2>
-            <p id="incoming-description"></p>
-            <ul id="incoming-items"></ul>
-            <div class="dialog-actions">
-                <button id="accept-transfer" type="button">Accept</button
-                ><button id="decline-transfer" type="button">Decline</button>
-            </div>
         </dialog>
 
         <dialog
@@ -593,8 +576,8 @@
                 </button>
             </div>
             <p>
-                Save files or open links here, even if you miss a parachute.
-                Items stay in this tab until you remove them or refresh.
+                Files and links appear here after their parachute enters your box
+                and the transfer finishes. Items stay until you remove them or refresh.
             </p>
             <p id="received-empty">Nothing received yet.</p>
             <div id="received-items"></div>

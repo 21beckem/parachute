@@ -704,6 +704,25 @@ a:focus-visible {
     display: none;
 }
 
+.delivery-offer-label {
+    position: absolute;
+    left: 50%;
+    bottom: -26px;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: min(240px, 48vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    padding: 5px 8px;
+    border: 1px solid var(--ink);
+    border-radius: 8px;
+    background: var(--cream);
+    color: var(--ink);
+    font: bold 12px 'Trebuchet MS', sans-serif;
+}
+
 .falling-parachute svg {
     display: block;
     width: 100%;
@@ -1168,22 +1187,48 @@ body:not(.has-entered) .transfer-tools {
     margin-top: 12px;
 }
 .received-entry {
-    border-top: 1px solid #293d5230;
-    margin-top: 16px;
-    padding-top: 16px;
+    border: 2px solid var(--ink);
+    border-radius: 16px;
+    padding: 14px;
+    background: #fffdf7;
+    box-shadow: 0 4px 0 #293d521a;
 }
+#received-dialog { width: min(650px, calc(100vw - 32px)); }
+#received-items { display: grid; gap: 16px; }
+.received-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.received-heading time { font-size: 12px; white-space: nowrap; color: #526a7e; }
 .received-entry h3 {
     font-size: 15px;
-    margin: 0 0 10px;
+    margin: 0;
 }
-.received-entry a {
-    color: #275b8c;
-    text-decoration: underline;
+.received-entry .received-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+    border: 2px solid #a8c6dc;
+    border-radius: 12px;
+    background: #edf5ff;
+    color: var(--ink);
+    text-decoration: none;
+    transition: background .15s, border-color .15s;
 }
+.received-item:hover { background: #e0efff; border-color: #356294; }
+.received-item-text { min-width: 0; display: grid; gap: 7px; }
+.received-item-text strong { font-size: 15px; overflow-wrap: anywhere; }
+.received-item-text small { font-size: 12px; color: #365c78; }
+.received-art { display: block; width: 84px; height: 70px; flex: 0 0 84px; }
+.received-thumbnail { width: 84px; height: 76px; flex: 0 0 84px; object-fit: contain; border-radius: 8px; background: white; }
+.received-art[hidden], .received-thumbnail[hidden] { display: none; }
+.received-package summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; cursor: pointer; border-radius: 12px; padding: 8px; background: #ffe5ad; border: 2px solid #ba945b; }
+.received-package summary span { flex: 1; font-weight: bold; }
+.received-package summary small { font-size: 12px; }
+.received-package-items { display: grid; gap: 10px; margin-top: 12px; }
 .received-entry button {
     font-size: 12px;
     padding: 7px 10px;
     background: transparent;
+    margin-top: 12px;
 }
 .share-dialog :focus-visible {
     outline: 3px solid #356294;

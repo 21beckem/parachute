@@ -4,6 +4,7 @@ class ParachuteTransfer {
     static MAX_BYTES = 100 * 1024 * 1024;
     static CHUNK_BYTES = 64 * 1024;
     static MAX_FILES = 20;
+    static OFFER_TIMEOUT_MS = 60000;
 
     constructor(channel, hooks = {}) {
         this.channel = channel;
@@ -69,6 +70,14 @@ class ParachuteTransfer {
         return total <= this.MAX_BYTES;
     }
 
+    static offerFor({ files = [], url, sender = 'Someone nearby' }) {
+        const manifest = { kind: url ? 'link' : 'files', sender: sender.trim().slice(0, 40) || 'Someone nearby' };
+        if (url) manifest.url = this.website(url);
+        else manifest.files = files.map(file => ({ name: file.name, size: file.size, mime: file.type || '' }));
+        if (!this.validateOffer(manifest)) throw Error('Choose up to 20 files, totaling no more than 100 MB.');
+        return manifest;
+    }
+
     packet(type, id, fields = {}) {
         if (this.closed || !this.channel.open)
             throw Error('The connection closed. Reconnect and send again.');
@@ -79,13 +88,13 @@ class ParachuteTransfer {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 state.waiter = null;
-                reject(
-                    Error(
+                const error = Error(
                         expected === 'accept'
-                            ? 'Your friend did not accept in time.'
+                            ? 'The parachute offer expired.'
                             : 'Transfer timed out. Reconnect and try again.'
-                    )
-                );
+                    );
+                if (expected === 'accept') error.code = 'offer-expired';
+                reject(error);
             }, timeout);
             state.waiter = { expected, sequence, resolve, reject, timer };
             try {
@@ -104,32 +113,20 @@ class ParachuteTransfer {
     ) {
         if (this.outgoing || this.closed || !this.channel.open)
             throw Error('Connect to someone before sending.');
-        const manifest = {
-            kind: url ? 'link' : 'files',
-            sender: sender.trim().slice(0, 40) || 'Your friend'
-        };
-        if (url) manifest.url = ParachuteTransfer.website(url);
-        else
-            manifest.files = files.map((file) => ({
-                name: file.name,
-                size: file.size,
-                mime: file.type || ''
-            }));
-        if (!ParachuteTransfer.validateOffer(manifest))
-            throw Error('Choose up to 20 files, totaling no more than 100 MB.');
+        const manifest = ParachuteTransfer.offerFor({ files, url, sender });
         const state = { id: crypto.randomUUID(), waiter: null };
         this.outgoing = state;
         const current = () =>
             !this.closed && this.channel.open && this.outgoing === state;
         try {
-            this.hooks.onStatus?.('Waiting for your friend to accept…', 0);
+            this.hooks.onStatus?.('Waiting for the parachute to enter their box…', 0);
             await this.request(
                 state,
                 'offer',
                 manifest,
                 'accept',
                 undefined,
-                60000
+                ParachuteTransfer.OFFER_TIMEOUT_MS
             );
             if (!current() || !(await launch()) || !current())
                 throw Error('Transfer cancelled.');
@@ -187,8 +184,8 @@ class ParachuteTransfer {
         const state = this.incoming;
         clearTimeout(state.timer);
         state.timer = setTimeout(
-            () => this.decline('Incoming transfer timed out.'),
-            state.accepted ? 45000 : 60000
+            () => this.decline(state.accepted ? 'Incoming transfer timed out.' : 'The parachute offer expired.', state.accepted ? 'timeout' : 'expired'),
+            state.accepted ? 45000 : ParachuteTransfer.OFFER_TIMEOUT_MS
         );
     }
 
@@ -202,12 +199,12 @@ class ParachuteTransfer {
         this.hooks.onStatus?.('Receiving your friend’s transfer…', 0);
     }
 
-    decline(message = 'Incoming transfer declined.') {
+    decline(message = 'Incoming transfer declined.', reason = 'declined') {
         const state = this.incoming;
         if (!state) return;
         clearTimeout(state.timer);
         this.incoming = null;
-        this.packet('decline', state.id);
+        this.packet('decline', state.id, { reason });
         this.hooks.onOffer?.(null);
         this.hooks.onStatus?.(message);
     }
@@ -228,9 +225,11 @@ class ParachuteTransfer {
                 if (waiter) {
                     clearTimeout(waiter.timer);
                     outgoing.waiter = null;
-                    waiter.reject(
-                        Error('Your friend declined or cancelled the transfer.')
-                    );
+                    const error = Error(data.reason === 'expired'
+                        ? 'The parachute offer expired.'
+                        : 'Your friend declined or cancelled the transfer.');
+                    if (data.reason === 'expired') error.code = 'offer-expired';
+                    waiter.reject(error);
                 }
                 // Also cancel a transfer that is waiting for the rocket or a file read.
                 this.outgoing = null;

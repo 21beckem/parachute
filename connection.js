@@ -10,7 +10,7 @@ class ParachuteConnection {
         this.active = false;
         this.starting = false;
         this.ready = false;
-        this.channel = null;
+        this.channels = new Map();
         this.generation = 0;
         this.state = document.getElementById('connection-state');
         this.message = document.getElementById('connection-message');
@@ -19,7 +19,6 @@ class ParachuteConnection {
         this.send = document.getElementById('send-parachute');
         this.panel = this.state.closest('.connection-panel');
         this.send.addEventListener('click', () => window.parachuteSharing?.open());
-        document.getElementById('disconnect-device').addEventListener('click', () => this.closeConnection());
         document.getElementById('retry-discovery').addEventListener('click', () => this.stopDiscovery());
         document.addEventListener('click', (event) => {
             if (!this.panel.contains(event.target)) this.panel.open = false;
@@ -68,23 +67,16 @@ class ParachuteConnection {
             });
             this.listen('peerRemoved', ({ uid }) => {
                 this.stopHandshake(uid);
-                const channel = this.channel;
-                const transport = window.parachuteSharing?.transport;
-                if (channel?.peer === uid && (transport?.outgoing || transport?.incoming)) {
-                    // A sound-match update is not proof that the relay socket
-                    // disconnected. Preserve this already-started transfer and
-                    // let a real relay failure or transfer timeout end it.
+                const channel = this.channels.get(uid);
+                if (channel && window.parachuteSharing?.hasActiveTransfer(uid)) {
                     void this.mesh.relayMessage(uid, { type: 'parachute:transfer-check:v1' }).catch(() => {
-                        if (this.channel === channel && !this.mesh.peers.includes(uid)) {
-                            this.devices.delete(uid);
-                            this.closeConnection('That device is no longer reachable. The transfer was stopped.');
-                        }
+                        if (this.channels.get(uid) === channel && !this.mesh.peers.includes(uid))
+                            this.closePeer(uid, 'That device is no longer reachable.');
                     });
-                    this.render();
-                    return;
+                } else {
+                    this.devices.delete(uid);
+                    this.closePeer(uid);
                 }
-                this.devices.delete(uid);
-                if (this.channel?.peer === uid) this.closeConnection('That device left the nearby list.');
                 this.render();
             });
             this.listen('peersUpdated', () => this.render());
@@ -95,7 +87,7 @@ class ParachuteConnection {
                 this.generation++;
                 for (const uid of this.handshakes.keys()) this.stopHandshake(uid);
                 this.devices.clear();
-                this.closeConnection('Discovery disconnected. Reload to reconnect.');
+                this.closeAll('Discovery disconnected. Reload to reconnect.');
                 document.getElementById('retry-discovery').hidden = false;
                 window.dispatchEvent(new CustomEvent('discovery-error', {
                     detail: 'Discovery disconnected. Reload to reconnect.'
@@ -258,100 +250,87 @@ class ParachuteConnection {
             return;
         }
         if (!this.active || msg.version !== 2) return;
-        // Once an offer has selected this peer, its replies remain valid even
-        // if the sound matcher temporarily removes it from the nearby list.
-        if (!this.mesh.peers.includes(from) && this.channel?.peer !== from) return;
-        if (msg.type === 'offer' && this.channel?.peer !== from) {
-            const transport = window.parachuteSharing?.transport;
-            if (transport?.outgoing || transport?.incoming) {
-                void this.mesh.relayMessage(from, { version: 2, type: 'decline', id: msg.id }).catch(() => {});
-                return;
-            }
-            this.selectDevice(from);
+        const sharing = window.parachuteSharing;
+        if (msg.type === 'offer' && !this.mesh.peers.includes(from)) {
+            void this.mesh.relayMessage(from, { version: 2, type: 'decline', id: msg.id, reason: 'not-nearby' }).catch(() => {});
+            return;
         }
-        if (this.channel?.peer === from) window.parachuteSharing?.transport?.receive(msg);
+        const existing = sharing?.transports.get(from);
+        if (!existing && !this.mesh.peers.includes(from)) return;
+        const transport = existing || sharing?.transportFor(from);
+        transport?.receive(msg);
     }
 
     receiveBinary({ from, payload, meta }) {
-        if (!this.active || this.channel?.peer !== from
+        if (!this.active || !this.channels.get(from)?.open
             || meta?.version !== 2 || meta.type !== 'chunk' || !ArrayBuffer.isView(payload)) return;
-        window.parachuteSharing?.transport?.receive({ ...meta, bytes: payload });
+        window.parachuteSharing?.transports.get(from)?.receive({ ...meta, bytes: payload });
     }
 
-    selectDevice(uid) {
-        if (!this.active || !this.mesh.peers.includes(uid)) return;
-        if (this.channel?.peer === uid) return;
-        const transport = window.parachuteSharing?.transport;
-        if (transport?.outgoing || transport?.incoming) {
-            this.render('Finish or cancel the current transfer before choosing another device.');
-            return;
-        }
-        this.closeConnection();
-        // This is a small transport adapter, not a PeerJS connection. JSON
-        // messages use relayMessage; file bytes use the mesh binary relay.
+    channelFor(uid) {
+        const existing = this.channels.get(uid);
+        if (existing?.open) return existing;
+        if (!this.active || !this.mesh.connected || !this.mesh.peers.includes(uid)) return null;
+        // Every recipient has an independent queue and transfer state.
         const channel = { open: true, peer: uid };
         let queue = Promise.resolve();
-        channel.send = (packet) => {
-            if (!channel.open) throw Error('The selected device disconnected.');
+        channel.send = packet => {
+            if (!channel.open) throw Error('The device disconnected.');
             queue = queue.then(async () => {
                 if (!channel.open) return;
                 if (packet.type === 'chunk') {
                     const { bytes, ...meta } = packet;
                     await this.mesh.relay(uid, bytes, { meta });
                 } else await this.mesh.relayMessage(uid, packet);
-            }).catch((error) => {
-                if (this.channel === channel) this.closeConnection(`Sharing failed: ${error.message}`);
+            }).catch(error => {
+                if (this.channels.get(uid) === channel)
+                    this.closePeer(uid, `Sharing with that device failed: ${error.message}`);
             });
             return queue;
         };
-        this.channel = channel;
-        window.parachuteSharing?.connected(channel);
-        this.render();
+        this.channels.set(uid, channel);
+        return channel;
     }
 
-    closeConnection(message) {
-        const transport = window.parachuteSharing?.transport;
-        const transfers = [transport?.outgoing, transport?.incoming];
-        if (this.channel?.open && this.mesh?.connected && this.active) {
-            for (const transfer of transfers) {
-                if (transfer) void this.mesh.relayMessage(this.channel.peer, {
-                    version: 2, type: 'cancel', id: transfer.id
-                }).catch(() => {});
-            }
-        }
-        if (this.channel) this.channel.open = false;
-        this.channel = null;
+    closePeer(uid, message) {
+        const channel = this.channels.get(uid);
+        if (channel) channel.open = false;
+        this.channels.delete(uid);
+        window.parachuteSharing?.closePeer(uid);
+        this.render(message);
+    }
+
+    closeAll(message) {
+        for (const channel of this.channels.values()) channel.open = false;
+        this.channels.clear();
         window.parachuteSharing?.reset();
         this.render(message);
     }
 
     render(message) {
-        const ids = this.active ? [...this.mesh.peers] : [];
-        const signalChanged = !!this.channel && !ids.includes(this.channel.peer);
-        if (this.active && signalChanged) ids.push(this.channel.peer);
-        this.state.textContent = this.channel ? 'Ready to share' : this.active ? `Nearby devices (${ids.length})` : 'Not connected';
-        this.panel.dataset.state = this.channel ? 'connected' : this.active ? 'ready' : 'offline';
-        this.message.textContent = message || (this.channel
-            ? `Sharing with ${this.devices.get(this.channel.peer)?.name || 'a nearby device'}.${signalChanged ? ' Room signal changed; keeping this sharing connection.' : ''}`
-            : this.active ? 'Choose a nearby device to share files or a link.' : 'Click Connect to start nearby discovery.');
+        const nearby = this.active ? [...this.mesh.peers] : [];
+        const ids = [...nearby];
+        for (const uid of this.channels.keys())
+            if (!ids.includes(uid) && window.parachuteSharing?.hasActiveTransfer(uid)) ids.push(uid);
+        this.state.textContent = this.active ? `Nearby devices (${nearby.length})` : 'Not connected';
+        this.panel.dataset.state = this.active ? 'ready' : 'offline';
+        this.message.textContent = message || (this.active
+            ? 'Drop parachute sends an offer to everyone currently nearby. Each person catches their own.'
+            : 'Click Connect to start nearby discovery.');
         this.list.replaceChildren();
         this.empty.hidden = ids.length > 0;
-        this.empty.textContent = this.active ? 'No devices found yet. Open Parachute on another device and click Connect.' : 'Nearby devices will appear after you connect.';
+        this.empty.textContent = this.active
+            ? 'No devices found yet. Open Parachute on another device and click Connect.'
+            : 'Nearby devices will appear after you connect.';
         for (const uid of ids) {
             const item = document.createElement('li');
-            const button = document.createElement('button');
-            const selected = uid === this.channel?.peer;
-            button.type = 'button';
-            button.disabled = !this.devices.has(uid);
-            button.textContent = `${this.devices.get(uid)?.name || 'Identifying device…'}${selected ? signalChanged ? ' · Selected (room signal changed)' : ' · Selected' : ''}`;
-            button.setAttribute('aria-pressed', String(selected));
-            button.addEventListener('click', () => this.selectDevice(uid));
-            item.append(button);
+            const label = document.createElement('span');
+            label.textContent = `${this.devices.get(uid)?.name || 'Identifying device…'}${nearby.includes(uid) ? '' : ' · Sharing (room signal changed)'}`;
+            item.append(label);
             this.list.append(item);
         }
-        document.getElementById('disconnect-device').hidden = !this.channel;
         document.getElementById('stop-discovery').hidden = !this.active;
-        this.send.disabled = !this.channel?.open;
+        this.send.disabled = !this.active || !nearby.length;
         window.parachuteSharing?.sync();
     }
 
@@ -359,7 +338,7 @@ class ParachuteConnection {
         this.generation++;
         this.active = this.ready = false;
         for (const uid of this.handshakes.keys()) this.stopHandshake(uid);
-        this.closeConnection();
+        this.closeAll();
         this.mesh?.disconnect();
         for (const unsubscribe of this.unsubscribers) unsubscribe();
         this.unsubscribers = [];
@@ -369,5 +348,6 @@ class ParachuteConnection {
         this.destroy();
         location.reload();
     }
+
 }
 window.parachuteConnection = new ParachuteConnection();

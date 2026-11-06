@@ -83,7 +83,7 @@ class Animation {
         return 'other';
     }
 
-    static dropParachute(payload = [], type = this.typeOf(payload)) {
+    static dropParachute(payload = [], type = this.typeOf(payload), options = {}) {
         this.initialize();
         const kinds = [
             'file',
@@ -95,7 +95,7 @@ class Animation {
             'other'
         ];
         if (!kinds.includes(type)) type = 'other';
-        const delivery = new ParachuteDelivery(this.normalize(payload), type);
+        const delivery = new ParachuteDelivery(this.normalize(payload), type, options);
         this.deliveries.add(delivery);
         delivery.start();
         this.announce(
@@ -223,9 +223,10 @@ class Animation {
 }
 
 class ParachuteDelivery {
-    constructor(files, type) {
+    constructor(files, type, options = {}) {
         this.files = files;
         this.type = type;
+        this.options = options;
         this.element = Animation.template.cloneNode(true);
         this.element.hidden = false;
         this.element.dataset.type = type;
@@ -447,7 +448,7 @@ class ParachuteDelivery {
             !this.paused &&
             this.y > innerHeight + margin
         ) {
-            this.cancel();
+            this.cancel('missed');
             return;
         }
         this.frame = requestAnimationFrame((time) => this.tick(time));
@@ -523,10 +524,11 @@ class ParachuteDelivery {
             return;
         }
         if (this.disposed) return;
-        this.cancel();
+        this.cancel('received');
         Animation.receiveFileInBox(this.files);
+        this.options.onCatch?.();
     }
-    cancel() {
+    cancel(reason = 'cancelled') {
         if (this.disposed) return;
         this.disposed = true;
         this.receiptAnimation?.cancel();
@@ -546,6 +548,7 @@ class ParachuteDelivery {
         this.element.remove();
         Animation.deliveries.delete(this);
         Animation.updateTarget();
+        if (reason !== 'received') this.options.onExpire?.(reason);
     }
 }
 

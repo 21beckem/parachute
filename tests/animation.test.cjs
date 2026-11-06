@@ -238,6 +238,44 @@ test('receiving animates into the box, cleans up just that delivery, and preserv
     assert.equal(manager.deliveries.size, 1);
 });
 
+test('offer acceptance fires after the entry animation, never before it', async () => {
+    const { api } = setup();
+    let caught = 0, expired = 0;
+    const delivery = api.dropParachute([], 'file', {
+        onCatch: () => caught++, onExpire: () => expired++
+    });
+    const receipt = delivery.finish();
+    assert.equal(caught, 0);
+    await receipt;
+    assert.equal(caught, 1);
+    assert.equal(expired, 0);
+    delivery.cancel();
+    assert.equal(expired, 0);
+});
+
+test('an offer falling out of view expires once', () => {
+    const { api } = setup();
+    const reasons = [];
+    const delivery = api.dropParachute([], 'link', { onExpire: reason => reasons.push(reason) });
+    delivery.y = 2000;
+    delivery.tick(16);
+    delivery.cancel();
+    assert.deepEqual(reasons, ['missed']);
+});
+
+test('expiration during box entry cannot accept a late offer', async () => {
+    const { api } = setup();
+    let complete, caught = 0, expired = 0;
+    const finished = new Promise(resolve => { complete = resolve; });
+    const delivery = api.dropParachute([], 'file', { onCatch: () => caught++, onExpire: () => expired++ });
+    delivery.element.animate = () => ({ finished, cancel() {} });
+    const receipt = delivery.finish();
+    delivery.cancel('expired');
+    complete(); await receipt;
+    assert.equal(caught, 0);
+    assert.equal(expired, 1);
+});
+
 test('pointer position highlights the box and release outside does not receive overlapping artwork', () => {
     const { api, manager } = setup();
     const d = api.dropFile();

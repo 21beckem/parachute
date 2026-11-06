@@ -53,20 +53,20 @@ address cannot request microphone and location access in most browsers.
    There is no new scanning animation.
 4. The nearby-device list opens. Open Parachute on another device, follow the
    same steps, and wait for the room match and name exchange.
-5. Choose a named device, then click **Drop parachute** to send files or a link.
-   The recipient must accept before file bytes are sent.
+5. Click **Drop parachute** to offer files or a link to everyone currently nearby.
+   Each recipient gets their own parachute. File transfer starts only after
+   their parachute finishes entering their box. Missed offers expire.
 6. Use **Received** to save files or open links. The rocket and parachute
    delivery animations still work.
 
-The list can show several nearby devices; sharing targets one person at a time.
-Incoming offers from another matched device select that sender when you are idle.
-Other offers are declined while a transfer is pending or active. If a room match
-disappears during an offer or transfer, Parachute keeps that selected sharing
+Each recipient has an independent transfer. One missed or disconnected recipient
+does not stop the others. Devices discovered after sending do not receive that offer.
+If a room match disappears during an offer or transfer, Parachute keeps that sharing
 connection and checks whether the relay can still reach the recipient. Its row
 is marked "room signal changed"; detector results themselves are not changed.
 Actual relay failures, server disconnection, and transfer timeouts still stop
-the transfer. New devices must still be discovered before they can send offers. **Clear selection** leaves
-nearby discovery running. **Stop discovery** reloads the page to release the
+the transfer. New devices must still be discovered before they can send offers.
+**Cancel send** withdraws outstanding outgoing offers. **Stop discovery** reloads the page to release the
 microphone, because the upstream singleton does not expose microphone cleanup or
 reconnection. Save received files before stopping or reloading.
 
@@ -114,13 +114,16 @@ nearby match has already been found.
 
 ## How file and link sharing works
 
-`connection.js` adapts the selected MeshClient peer to the transfer protocol. `sharing.js` handles
-file selection, incoming approval, progress, and download links. `transfer.js`
+`connection.js` adapts each nearby MeshClient peer to the transfer protocol. `sharing.js` handles
+file selection, box catches, per-recipient progress, and download links. `transfer.js`
 handles the content protocol independently of the animations.
 
 1. **Offer:** send the display name and file names, sizes, and MIME types, or the
-   website URL. No file bytes are sent until the other person accepts.
-2. **Accept:** the recipient approves; the sender launches the rocket.
+   website URL. The rocket launches once, and each nearby device gets an offer.
+   No file bytes are read or sent before that recipient catches it.
+2. **Catch:** drag the parachute into the box. Only when its entry animation
+   finishes does the recipient send approval. There is no separate Accept dialog.
+   Falling offscreen or waiting 60 seconds expires the offer.
 3. **Chunks:** read files in 64 KiB slices with `File.slice().arrayBuffer()`.
    Send one binary slice at a time and wait for a `chunk-received` reply before
    reading the next. This keeps queued data bounded and supplies progress.
@@ -133,16 +136,28 @@ handles the content protocol independently of the animations.
    allow only HTTP/HTTPS and open only when clicked. Remote text uses
    `textContent`, never HTML insertion. File names cannot contain path separators.
 
+Received uses the existing payload artwork on cards with the sender, receipt
+time, file size, and action. Multi-file transfers appear as an expandable box
+package, with a separate card for each file inside. Click an item once to download
+it or open its link. Photos use a small local thumbnail; unsupported images fall
+back to the picture artwork. Duplicate file names or URLs receive #1, #2, etc.
+labels while preserving original download names. Removing an earlier duplicate
+does not renumber the remaining items. Preview and download share one object URL,
+which is released when the entry is removed or the page exits.
+
+For a sensor-free Received design preview, run `node tests/received-preview.cjs`
+and open `http://localhost:3004`. It uses sample files and the project's mockup image.
+
 The version-2 messages are `offer`, `accept`, `decline`, `chunk`,
 `chunk-received`, `finish`, `complete`, and `cancel`. A random transfer ID ties
 replies to the correct send. Each chunk includes file index, byte offset, sequence
 number, and binary bytes.
 
 Limits: 20 files, 100 MiB (shown as 100 MB in the UI) per transfer; 100 MiB total
-retained in Received and 100 retained transfers per tab. Zip ordinary folders
+retained or reserved for accepted incoming transfers, and 100 retained transfers per tab.
+At most 20 pending parachutes are shown. Zip ordinary folders
 first. The browser retains received content in memory until Remove, page exit,
-or refresh; save it first. Remove revokes download URLs and cancels that entry's
-remaining animation. Transfers are not resumable. Disconnects, cancellation,
+or refresh; save it first. Remove revokes download URLs. Transfers are not resumable. Disconnects, cancellation,
 invalid chunks, or inactivity abort incomplete transfers. There is a 60-second
 acceptance timeout and a 30-second wait for each acknowledgment. A sender using
 an old page that does not support this protocol will time out; refresh both pages.
@@ -200,8 +215,11 @@ Releasing the pointer anywhere on the main box lifts that same delivery above
 the rim, then lowers it in front of the dark interior and behind the front panel.
 The flaps close only after the delivery is completely inside. The sequence
 then emits `file-received` on `.drop-box`, with the
-original payload array in `event.detail.files`. The sharing controller listens
-for this event to open Received. The animations themselves do not transmit data.
+original payload array in `event.detail.files`. Offer deliveries also use
+`onCatch` after entry and `onExpire` on cancellation or a miss. Sharing uses
+these callbacks to approve or expire the offer. Received stays closed until
+the user opens it, so another incoming parachute can still be caught.
+The animations themselves do not transmit data.
 `window.animation` provides the public methods. `window.ParachuteAnimation`
 exposes the controller class.
 
@@ -218,17 +236,19 @@ and reopens three seconds after the latest receipt.
 The drop button stays on the pad throughout both rocket animations. The peer
 controller uses the independent connection hooks so preparation continues until
 the connection succeeds or is cancelled. `launchRocket()` only plays the launch
-animation; `sharing.js` starts it after the recipient accepts.
+animation; `sharing.js` starts it when broadcasting the offer.
 
 Run controller and physics checks with `node --test tests/animation.test.cjs`.
 
 
 ## Real relay regression check
 
-Run `node tests/relay-preview.cjs` and open `http://localhost:3003` in two tabs.
+Run `node tests/relay-preview.cjs` and open `http://localhost:3003` in three tabs.
 This uses the real hosted MeshClient and JSON/binary relays, with generated audio,
 a test position, and controlled discovery notices. No real sensors are accessed.
-Choose a recipient and offer a file. Before accepting on the recipient, click
-**Hide test room match** in the sender's dialog. Accept the offer and check that
-the file arrives intact; send a link in the opposite direction and test Decline.
+Offer a file without selecting a recipient. Catch it in one receiver's box and
+let the other miss. Check that only the catcher receives the intact file and
+the sender reports one received and one expired. Send a link back and catch it.
+The **Hide test room match** control in fixture dialogs can also test an active
+transfer surviving a temporary discovery change.
 The matching controls exist only in this local test harness.
