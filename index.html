@@ -9,15 +9,17 @@
             content="Parachute — connect with a friend and drop a parachute into their sky."
         />
         <title>Parachute</title>
-        <link rel="stylesheet" href="background.css" />
-        <link rel="stylesheet" href="style.css?v=request-file-1" />
-        <script src="parachute.js?v=request-file-1" defer></script>
+        <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="background.css?v=welcome-flight-1" />
+        <link rel="stylesheet" href="style.css?v=welcome-flight-1" />
+        <script src="parachute.js?v=torn-parachute-1" defer></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
         <script src="transfer.js?v=request-file-1" defer></script>
         <script src="mesh-loader.js?v=request-file-1" defer></script>
-        <script src="connection.js?v=request-file-1" defer></script>
-        <script src="welcome.js?v=request-file-1" defer></script>
-        <script src="sharing.js?v=request-file-1" defer></script>
+        <script src="connection.js?v=welcome-flight-1" defer></script>
+        <script src="warmup.js?v=welcome-flight-1" defer></script>
+        <script src="welcome.js?v=welcome-flight-1" defer></script>
+        <script src="sharing.js?v=torn-parachute-1" defer></script>
     </head>
     <body>
         <!-- Reusable artwork for the branding and draggable delivery. -->
@@ -58,6 +60,15 @@
                             d="m53 85 38 73m56-73-38 73M100 82v76"
                             fill="none"
                         />
+                    </g>
+                </symbol>
+                <mask id="canopy-holes" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="190">
+                    <rect width="200" height="190" fill="white" />
+                    <path d="m40 45 8-7 7 6-2 12-11 1Z M117 28l10-5 8 7-4 12-12-3Z M80 68l8-6 9 6-3 10-11-1Z M150 61l9-6 8 7-4 12-10-2Z" fill="black" />
+                </mask>
+                <symbol id="parachute-damaged" viewBox="0 0 200 190">
+                    <g transform="translate(30 25) scale(.7 .75)" mask="url(#canopy-holes)">
+                        <use href="#parachute" width="200" height="190" />
                     </g>
                 </symbol>
                 <symbol id="payload-file" viewBox="0 0 200 230">

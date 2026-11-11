@@ -12,6 +12,7 @@ test('both permissions must succeed before the five-second window; each sensor i
     await a.advance(10000);
     assert.equal(a.events.some(event => event.type === 'discovery-warmup-start'), false);
     geo.resolve({ coords: {} }); await flush();
+    assert.equal(a.events.some(event => event.type === 'discovery-scanner-ready'), true);
     assert.equal(a.events.find(event => event.type === 'discovery-warmup-start').at, 10000);
     await a.advance(4999); assert.equal(a.c.active, false);
     await a.advance(1); assert.equal(await pending, true);
@@ -25,6 +26,7 @@ test('a slow analyzer keeps sharing locked beyond five seconds', async t => {
     const a = client(1, { beginResult });
     await a.c.loading;
     const pending = a.c.begin('A'); await flush();
+    assert.equal(a.events.some(event => event.type === 'discovery-scanner-ready'), false);
     await a.advance(8000); assert.equal(a.c.active, false);
     beginResult.resolve({ success: true }); await flush(); await a.advance(0);
     assert.equal(await pending, true);

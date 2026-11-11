@@ -50,7 +50,8 @@ address cannot request microphone and location access in most browsers.
 2. Allow **both microphone and location**. Neither is requested on page load.
 3. Wait at least **five seconds after both permissions succeed**. The scanner
    also waits for MeshClient's first audio feature packet and server readiness.
-   There is no new scanning animation.
+   The logo parachute approaches for four seconds, then softly bumps the camera
+   into a one-second pan down. No sound effects or progress bar are added.
 4. The nearby-device list opens. Open Parachute on another device, follow the
    same steps, and wait for the room match and name exchange.
 5. Click **Drop parachute** to offer files or a link to everyone currently nearby.
@@ -91,8 +92,9 @@ Microphone and location access require HTTPS (localhost is the development
 exception). An internet connection and the upstream hosted service are required.
 The welcome screen shows when the scanner is ready or could not load. A startup
 failure restores the Connect button and offers a reload, rather than leaving
-it disabled. Camera descent still follows successful discovery startup and the
-five-second window after both permissions succeed.
+it disabled. The camera can begin its descent after four seconds once MeshClient
+is ready; sharing stays locked until both the full five-second sensor window
+and the camera sequence have finished.
 
 MeshClient makes the microphone and location requests itself; Parachute observes
 those same requests to time the five-second window. It does not request either
@@ -106,11 +108,15 @@ exchanged with matched devices through `relayMessage()`. JSON transfer messages
 use `relayMessage()` and binary file chunks use `relay()`. Files pass through the
 hosted server rather than a PeerJS/WebRTC data channel.
 
-Future scanning animations can listen for `discovery-warmup-start` (with
-`durationMs` and `startedAt`), `discovery-warmup-end`, and
-`discovery-warmup-error` events on `window`. The end event means both the minimum
-five-second window and MeshClient readiness have completed; it does not mean a
-nearby match has already been found.
+`warmup.js` owns the approaching logo parachute, swaying hold, soft camera bump,
+and pan. `welcome.js` starts it on `discovery-warmup-start` after both permissions
+are accepted. `discovery-scanner-ready` releases the final approach once the hosted
+scanner is ready. A slow startup keeps the parachute swaying after the first
+3.5 seconds, then plays the final half-second approach and one-second descent.
+`discovery-warmup-end` still means both the full five seconds and MeshClient
+readiness have completed; it does not imply a nearby match. Failures and page
+exit cancel all effects and remove the overlay. Reduced-motion mode preserves
+the permission timing with fades instead of zooming, swaying, or moving the camera.
 
 ## How file and link sharing works
 
@@ -152,7 +158,10 @@ which is released when the entry is removed or the page exits.
 While an offer or transfer is active, each peer is checked every two seconds
 with a three-second reachability timeout. A lost room-sound match alone does
 not withdraw an available file. A confirmed relay failure or departure notice
-removes that sender's parachute and any incomplete loading indicator immediately.
+withdraws that sender's offer and any incomplete loading indicator immediately.
+The remaining parachute is a disabled visual: its canopy shrinks and develops
+holes, any held pointer is released, and gravity carries it offscreen. It cannot
+be dragged, paused, caught, or downloaded. Other parachutes remain interactive.
 Normal exits send a best-effort departure notice before disconnecting; sudden
 network loss can take about five seconds to detect (longer if the browser
 throttles background timers). Completed Received items stay available locally.
@@ -162,6 +171,9 @@ and open `http://localhost:3004`. It uses sample files and the project's mockup 
 Add `?arrival-preview` to pause the large icon for inspection, then use
 **Finish arrival preview** to watch it zoom into the box. This pause control
 exists only in the local fixture.
+Use `?disconnect-preview` to test a sender leaving during a drag. The preview
+disconnects its test sender shortly after grabbing the parachute; a separate
+**Disconnect preview sender** button also tests an untouched drop.
 
 The version-2 messages are `offer`, `accept`, `decline`, `chunk`,
 `chunk-received`, `finish`, `complete`, and `cancel`. A random transfer ID ties
@@ -193,6 +205,7 @@ To exercise the real hosted detector and audio/WASM pipeline, run
 `node tests/detector-preview.cjs` and open `http://localhost:3002`. It uses generated
 sound and a test position at 0,0, which are sent to the hosted detector; it does
 not access real sensors. Add `?location-timeout=1` to test the location-error UI.
+Add `?slow-scanner=1` to delay scanner readiness and inspect the extended sway.
 
 ## Animation API
 
@@ -224,6 +237,8 @@ animation.stopConnecting(); // Call on cancellation/failure to return to idle
 
 // Optional: remove a specific drop without affecting any others.
 delivery.cancel();
+// Withdraw an unavailable delivery, release its pointer, and let it fall away.
+delivery.disconnect();
 ```
 
 Releasing the pointer anywhere on the main box lifts that same delivery above

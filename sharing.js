@@ -167,12 +167,13 @@ class ParachuteSharing {
         item.transport.decline('The parachute offer expired.', 'expired');
     }
 
-    clearOffer(uid) {
+    clearOffer(uid, reason = 'cancelled') {
         const item = this.offers.get(uid);
         if (!item) return;
         this.offers.delete(uid);
         clearTimeout(item.timer);
-        item.delivery?.cancel();
+        if (reason === 'disconnected') item.delivery?.disconnect();
+        else item.delivery?.cancel();
         item.loading?.remove();
     }
 
@@ -407,8 +408,10 @@ class ParachuteSharing {
         const hadIncoming = this.offers.has(uid);
         const transport = this.transports.get(uid);
         this.transports.delete(uid);
+        // Withdraw the offer first; transport.close() also invokes onOffer(null).
+        // Its remaining DOM is only a disabled falling visual, never a catchable offer.
+        this.clearOffer(uid, 'disconnected');
         transport?.close();
-        this.clearOffer(uid);
         if (hadIncoming && !this.batch) {
             this.status('The sender is no longer available. Its unfinished delivery was removed.');
             window.ParachuteAnimation.announce?.('The sender disconnected. Delivery removed.');

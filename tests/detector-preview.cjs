@@ -36,6 +36,21 @@ navigator.geolocation.getCurrentPosition = (success, failure, options) => {
 };
 window.addEventListener('pagehide', () => { for (const context of testContexts) void context.close(); });
 `;
+const slowScanner = `
+const loadMesh = window.loadParachuteMesh;
+window.loadParachuteMesh = async () => {
+    const { MeshClient } = await loadMesh();
+    return { MeshClient: new Proxy(MeshClient, { get(target, key) {
+        if (key === 'begin') return async () => {
+            const result = await target.begin();
+            await new Promise(resolve => setTimeout(resolve, 7500));
+            return result;
+        };
+        const value = Reflect.get(target, key, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+    } }) };
+};
+`;
 function createDetectorPreview({ relayTest = false } = {}) {
     const server = createParachuteServer();
     const serve = server.listeners('request')[0];
@@ -46,12 +61,16 @@ function createDetectorPreview({ relayTest = false } = {}) {
             res.setHeader('Content-Type', 'text/html');
             return res.end(readFileSync(path.join(__dirname, '../index.html'), 'utf8')
                 .replace('<title>Parachute</title>', '<title>Parachute · real detector test</title><script src="/synthetic-sensors.js"></script>')
-                .replace('<script src="connection.js', `${relayTest ? '<script src="/relay-discovery.js" defer></script>' : ''}<script src="connection.js`)
+                .replace('<script src="connection.js', `${relayTest ? '<script src="/relay-discovery.js" defer></script>' : ''}${url.searchParams.has('slow-scanner') ? '<script src="/slow-scanner.js" defer></script>' : ''}<script src="connection.js`)
                 .replace('<body>', '<body><p style="position:fixed;bottom:0;right:0;z-index:20;background:white;color:black;margin:0;padding:4px;font-size:12px">Test: real detector, synthetic audio and location</p>'));
         }
         if (url.pathname === '/synthetic-sensors.js') {
             res.setHeader('Content-Type', 'text/javascript');
             return res.end(sensors);
+        }
+        if (url.pathname === '/slow-scanner.js') {
+            res.setHeader('Content-Type', 'text/javascript');
+            return res.end(slowScanner);
         }
         if (relayTest && url.pathname === '/relay-discovery.js') {
             res.setHeader('Content-Type', 'text/javascript');

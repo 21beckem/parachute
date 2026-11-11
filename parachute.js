@@ -135,7 +135,7 @@ class Animation {
             'is-drop-target',
             [...this.deliveries].some(
                 (d) =>
-                    !d.receiving &&
+                    !d.receiving && !d.unavailable &&
                     (d.pointer !== null
                         ? d.isPointOverBox(d.pointerX, d.pointerY)
                         : d.paused && d.isFileOverBox())
@@ -257,6 +257,7 @@ class ParachuteDelivery {
             });
         on('pointerdown', (event) => {
             if (
+                this.unavailable ||
                 this.receiving ||
                 !event.isPrimary ||
                 event.button !== 0 ||
@@ -303,6 +304,7 @@ class ParachuteDelivery {
         this.frame = requestAnimationFrame((time) => this.tick(time));
     }
     release(event) {
+        if (this.unavailable) return;
         if (this.pointer === null || event.pointerId !== this.pointer) return;
         const received =
             event.type === 'pointerup' &&
@@ -318,7 +320,7 @@ class ParachuteDelivery {
         else Animation.updateTarget();
     }
     keydown(event) {
-        if (this.receiving) return;
+        if (this.receiving || this.unavailable) return;
         if (event.key === ' ' || event.key === 'Enter') {
             event.preventDefault();
             if (event.key === 'Enter' && this.isFileOverBox())
@@ -424,6 +426,12 @@ class ParachuteDelivery {
                 ((this.targetY + 7 + float - this.y) * 65 - this.vy * 12) * dt;
             this.x += this.vx * dt;
             this.y += this.vy * dt;
+        } else if (this.unavailable) {
+            // A torn canopy no longer provides lift or limits the falling speed.
+            this.vx *= Math.exp(-1.5 * dt);
+            this.vy = Math.min(1000, this.vy + 1150 * dt);
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
         } else if (!this.paused) {
             // Gentle air resistance preserves a throw, then gradually slows its drift.
             this.vx *= Math.exp(-0.45 * dt);
@@ -433,6 +441,7 @@ class ParachuteDelivery {
         }
         const desiredAngle = Animation.reducedMotion.matches
             ? 0
+            : this.unavailable ? Math.sin(this.time * 7) * 9
             : Animation.clamp(-this.vx * 0.13 + wind * 0.18, -18, 18);
         this.angularVelocity +=
             ((desiredAngle - this.angle) * 30 - this.angularVelocity * 7) * dt;
@@ -448,13 +457,13 @@ class ParachuteDelivery {
             !this.paused &&
             this.y > innerHeight + margin
         ) {
-            this.cancel('missed');
+            this.cancel(this.unavailable ? 'disconnected' : 'missed');
             return;
         }
         this.frame = requestAnimationFrame((time) => this.tick(time));
     }
     async finish() {
-        if (this.disposed || this.receiving) return;
+        if (this.disposed || this.receiving || this.unavailable) return;
         this.receiving = true;
         cancelAnimationFrame(this.frame);
         this.element.classList.remove('is-grabbed');
@@ -489,7 +498,7 @@ class ParachuteDelivery {
                 }
             );
             await this.receiptAnimation.finished;
-            if (this.disposed) return;
+            if (this.disposed || this.unavailable) return;
             if (!Animation.reducedMotion.matches) {
                 // Place it inside the box's stacking context: back (0), delivery (1), front (2).
                 // Local coordinates keep the descent attached to the box during layout changes.
@@ -520,14 +529,48 @@ class ParachuteDelivery {
             }
         } catch {
             // Cancelling a delivery also cancels its pending receipt.
-            this.cancel();
+            if (!this.unavailable) this.cancel();
             return;
         }
-        if (this.disposed) return;
+        if (this.disposed || this.unavailable) return;
         this.cancel('received');
         if (this.options.onCatch) this.options.onCatch();
         else Animation.receiveFileInBox(this.files);
     }
+    disconnect() {
+        if (this.disposed || this.unavailable) return;
+        this.unavailable = true;
+        if (this.receiving) {
+            const rect = this.element.getBoundingClientRect();
+            this.x = rect.left;
+            this.y = rect.top;
+        }
+        this.receiving = this.paused = false;
+        this.events.abort();
+        const pointer = this.pointer;
+        this.pointer = null;
+        if (pointer !== null && this.element.hasPointerCapture(pointer))
+            this.element.releasePointerCapture(pointer);
+        this.receiptAnimation?.cancel();
+        this.element.classList.remove('is-grabbed', 'is-entering-box', 'is-inside-box', 'is-offer');
+        this.element.classList.add('is-disconnected');
+        this.element.disabled = true;
+        this.element.tabIndex = -1;
+        this.element.setAttribute('aria-disabled', 'true');
+        this.element.setAttribute('aria-pressed', 'false');
+        this.element.setAttribute('aria-label', 'Sender disconnected. Torn parachute falling away.');
+        this.element.querySelector('use').setAttribute('href', '#parachute-damaged');
+        document.querySelector('.airspace').append(this.element);
+        if (document.activeElement === this.element)
+            document.querySelector('#send-parachute')?.focus({ preventScroll: true });
+        this.vx = Animation.clamp(this.vx, -70, 70);
+        this.vy = Math.max(90, this.vy);
+        this.last = null;
+        cancelAnimationFrame(this.frame);
+        this.render();
+        this.frame = requestAnimationFrame((time) => this.tick(time));
+    }
+
     cancel(reason = 'cancelled') {
         if (this.disposed) return;
         this.disposed = true;

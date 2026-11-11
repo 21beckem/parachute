@@ -12,7 +12,22 @@
     const reload = document.getElementById('welcome-reload');
     reload.addEventListener('click', () => window.parachuteConnection.stopDiscovery());
     let starting = false;
-    window.addEventListener('discovery-error', (event) => { status.textContent = event.detail; });
+    let flight = null;
+    let scannerReady = false;
+    const cancelFlight = () => { flight?.cancel(); flight = null; };
+    window.addEventListener('discovery-error', (event) => { cancelFlight(); status.textContent = event.detail; });
+    window.addEventListener('discovery-warmup-error', cancelFlight);
+    window.addEventListener('pagehide', cancelFlight);
+    window.addEventListener('discovery-warmup-start', () => {
+        if (!starting || flight) return;
+        input.blur();
+        flight = new window.ParachuteWelcomeFlight();
+        if (scannerReady) flight.ready();
+    });
+    window.addEventListener('discovery-scanner-ready', () => {
+        scannerReady = true;
+        flight?.ready();
+    });
     window.addEventListener('discovery-initialized', () => {
         if (!starting) status.textContent = 'Scanner ready. Enter your name and click Connect.';
     });
@@ -25,7 +40,7 @@
     }
 
     function positionTitle() {
-        if (body.classList.contains('has-entered')) return;
+        if (body.classList.contains('has-entered') || flight) return;
         const scale = Math.min(1.35, (innerWidth - 36) / wordmark.offsetWidth);
         const header = wordmark.offsetParent;
         body.style.setProperty(
@@ -57,6 +72,7 @@
         }
         if (starting || body.classList.contains('has-entered')) return;
         starting = true;
+        scannerReady = false;
         reload.hidden = false;
         button.disabled = input.disabled = true;
         button.textContent = 'Connecting…';
@@ -65,6 +81,7 @@
             connected = await window.parachuteConnection.begin(displayName, (message) => {
                 status.textContent = message;
             });
+            if (connected && flight) connected = await flight.finished;
         } catch (error) {
             status.textContent = error.message || 'The scanner could not start. Reload to retry.';
         } finally {
@@ -72,7 +89,7 @@
             button.disabled = input.disabled = false;
             button.textContent = 'Connect';
         }
-        if (!connected) return;
+        if (!connected) { cancelFlight(); positionTitle(); return; }
         reload.hidden = true;
         try {
             sessionStorage.setItem('parachute.displayName', displayName);
@@ -86,6 +103,9 @@
         input.blur();
         welcome.inert = true;
         body.classList.add('has-entered');
+        const animated = !!flight;
+        flight?.dispose();
+        flight = null;
         // Discovery is ready and the five-second permission window has ended.
         setTimeout(
             () => {
@@ -94,7 +114,7 @@
                 wordmark.removeAttribute('tabindex');
                 tools.querySelector('summary').focus({ preventScroll: true });
             },
-            reducedMotion.matches ? 0 : 1800
+            animated || reducedMotion.matches ? 0 : 1000
         );
     });
 })();

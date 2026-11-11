@@ -49,7 +49,7 @@ test('sender departure removes all uncaught parachutes without waiting for offer
     assert.equal(a.mesh.calls.filter(call => call.msg?.type === 'parachute:leaving:v1').length, 2);
     for (const app of [b, c]) {
         assert.equal(app.sharing.offers.size, 0);
-        assert.equal(app.deliveries.size, 0);
+        assert.equal([...app.deliveries].every(delivery => delivery.unavailable), true, 'only disabled falling visuals remain');
         assert.equal(app.sharing.entries.size, 0);
     }
 });
@@ -64,7 +64,7 @@ test('silent sender loss is detected even while the nearby list is stale', async
     await b.advance(2000);
     assert.equal(b.mesh.peers.includes(1), true, 'no detector peerRemoved event was needed');
     assert.equal(b.sharing.offers.size, 0);
-    assert.equal(delivery.disposed, true);
+    assert.equal(delivery.unavailable, true);
     delivery.options.onCatch();
     assert.equal(b.sharing.entries.size, 0);
     a.sharing.cancel(); await send;

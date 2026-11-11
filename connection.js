@@ -172,6 +172,7 @@ class ParachuteConnection {
             // may not call the observers. Successful begin still confirms both.
             audioAccepted = locationAccepted = true;
             permissionsReady();
+            window.dispatchEvent(new CustomEvent('discovery-scanner-ready'));
             await new Promise((resolve) => setTimeout(resolve, Math.max(0, WARMUP_MS - (Date.now() - permissionsAcceptedAt))));
             if (!current() || !this.mesh.connected) throw Error('Discovery stopped. Reload to reconnect.');
             this.ready = this.active = true;

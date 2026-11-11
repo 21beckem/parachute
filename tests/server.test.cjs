@@ -22,11 +22,13 @@ test('serves nearby discovery and sharing without loading PeerJS in the app', as
     );
     for (const file of [
         'style.css',
+        'favicon.svg',
         'background.css',
         'parachute.js',
         'connection.js',
         'mesh-loader.js',
         'welcome.js',
+        'warmup.js',
         'transfer.js',
         'sharing.js',
         'vendor/peerjs.min.js',
@@ -36,6 +38,8 @@ test('serves nearby discovery and sharing without loading PeerJS in the app', as
         assert.equal(response.status, 200, file);
         if (file.endsWith('.js'))
             assert.match(response.headers.get('content-type'), /javascript/);
+        if (file.endsWith('.svg'))
+            assert.match(response.headers.get('content-type'), /image\/svg\+xml/);
     }
     const head = await fetch(url, { method: 'HEAD' });
     assert.equal(head.status, 200);

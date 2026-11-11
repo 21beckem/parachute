@@ -87,6 +87,7 @@ function setup(t) {
                 dropParachute(preview, type, options) {
                     const delivery = {
                         element: element(Symbol()), preview, type, options, disposed: false,
+                        disconnect() { if (!this.disposed) this.unavailable = true; },
                         cancel(reason = 'cancelled') {
                             if (this.disposed) return;
                             this.disposed = true;

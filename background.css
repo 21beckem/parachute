@@ -63,7 +63,7 @@
 }
 
 .has-entered .scenery {
-    transition: transform 1.8s cubic-bezier(0.65, 0, 0.25, 1);
+    transition: transform 1s cubic-bezier(0.65, 0, 0.25, 1);
 }
 .welcome-active:not(.has-entered) .scenery {
     transform: translateY(0);

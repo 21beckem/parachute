@@ -20,7 +20,15 @@ function setup(begin) {
         classList: { add: (...names) => names.forEach(name => classes.add(name)), contains: name => classes.has(name) },
         style: { setProperty() {} }
     };
-    const window = { addEventListener() {}, parachuteConnection: { begin, stopDiscovery() {} } };
+    const events = {}, flights = [];
+    const window = { addEventListener(name, fn) { events[name] = fn; }, parachuteConnection: { begin, stopDiscovery() {} },
+        ParachuteWelcomeFlight: class {
+            constructor() { flights.push(this); this.finished = new Promise(resolve => { this.complete = resolve; }); }
+            ready() { this.readyCalled = true; }
+            dispose() { this.disposed = true; }
+            cancel() { this.cancelled = true; this.complete(false); }
+        }
+    };
     vm.runInNewContext(source, {
         window, document: { body, getElementById: element, querySelector: element },
         sessionStorage: { getItem: () => '', setItem() {} },
@@ -28,8 +36,39 @@ function setup(begin) {
         setTimeout: fn => timers.push(fn)
     });
     element('display-name').value = 'Test user';
-    return { element, classes, timers, submit: () => element('welcome-form').listeners.submit({ preventDefault() {} }) };
+    return { element, classes, timers, flights, emit: (name, detail) => events[name]?.({ detail }), submit: () => element('welcome-form').listeners.submit({ preventDefault() {} }) };
 }
+
+test('warmup flight starts after permission acceptance and sharing waits for both scanner and pan', async () => {
+    let ready;
+    const s = setup(() => new Promise(resolve => { ready = resolve; }));
+    const pending = s.submit();
+    assert.equal(s.flights.length, 0, 'permission prompts have no animation');
+    s.emit('discovery-warmup-start');
+    assert.equal(s.flights.length, 1);
+    s.emit('discovery-scanner-ready');
+    assert.equal(s.flights[0].readyCalled, true);
+    ready(true); await Promise.resolve();
+    assert.equal(s.classes.has('has-entered'), false);
+    assert.equal(s.element('main').inert, true);
+    s.flights[0].complete(true); await pending;
+    assert.equal(s.classes.has('has-entered'), true);
+    assert.equal(s.flights[0].disposed, true);
+    s.timers[0]();
+    assert.equal(s.element('main').inert, false);
+});
+
+test('a scanner error cancels the warmup flight and restores the welcome controls', async () => {
+    let ready;
+    const s = setup(() => new Promise(resolve => { ready = resolve; }));
+    const pending = s.submit();
+    s.emit('discovery-warmup-start');
+    s.emit('discovery-warmup-error', 'Scanner failed');
+    ready(false); await pending;
+    assert.equal(s.flights[0].cancelled, true);
+    assert.equal(s.classes.has('has-entered'), false);
+    assert.equal(s.element('welcome-connect').disabled, false);
+});
 
 test('camera pan waits for discovery readiness, then reveals the sharing scene', async () => {
     let finish;

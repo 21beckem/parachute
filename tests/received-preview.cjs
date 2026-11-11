@@ -24,6 +24,21 @@ if (new URLSearchParams(location.search).has('arrival-preview')) {
     finish.addEventListener('click', () => { flight.play(); finish.remove(); });
     document.body.append(finish);
 }
+if (new URLSearchParams(location.search).has('disconnect-preview')) {
+    sharing.receivedDialog.close();
+    const offer = { id: 'preview-offer', sender: 'Preview sender', kind: 'files', files: [{ name: 'unavailable.txt', size: 10, mime: 'text/plain' }] };
+    sharing.transports.set(999, { incoming: offer, close() { sharing.offer(999, null); } });
+    sharing.offer(999, offer);
+    const delivery = sharing.offers.get(999).delivery;
+    delivery.paused = true;
+    const leave = () => sharing.closePeer(999);
+    delivery.element.addEventListener('pointerdown', () => setTimeout(leave, 100), { once: true });
+    const disconnect = document.createElement('button');
+    disconnect.textContent = 'Disconnect preview sender';
+    disconnect.style.cssText = 'position:fixed;top:110px;left:20px;z-index:8;padding:12px';
+    disconnect.addEventListener('click', leave);
+    document.body.append(disconnect);
+}
 `;
 const photo = readFileSync(path.join(__dirname, '../mockups/chatgpt-mockup-sep-21.png')).toString('base64');
 const server = createParachuteServer();

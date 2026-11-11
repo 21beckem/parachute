@@ -255,6 +255,60 @@ test('offer acceptance fires after the entry animation, never before it', async 
     assert.equal(expired, 0);
 });
 
+test('disconnect releases a held parachute, disables catches, and accelerates it out of view', async () => {
+    const { api, manager } = setup();
+    let caught = 0;
+    const reasons = [];
+    const d = api.dropParachute([], 'file', { onCatch: () => caught++, onExpire: reason => reasons.push(reason) });
+    const healthy = api.dropFile();
+    d.pointer = 42; d.paused = true;
+    d.element.setPointerCapture(42);
+    d.element.classes.add('is-grabbed');
+    d.element.focus();
+    d.disconnect();
+    d.disconnect();
+    assert.equal(d.pointer, null);
+    assert.equal(d.element.hasPointerCapture(42), false);
+    assert.equal(d.events.signal.aborted, true);
+    assert.equal(d.element.disabled, true);
+    assert.equal(d.element.tabIndex, -1);
+    assert.equal(d.paused, false);
+    assert.equal(d.element.querySelector('use').attributes.href, '#parachute-damaged');
+    assert.equal(d.disposed, false, 'the disconnected visual stays until it falls away');
+    const x = d.x;
+    d.keydown({ key: 'ArrowRight', preventDefault() { throw Error('must ignore keyboard'); } });
+    d.release({ pointerId: 42, type: 'pointerup', clientX: 600, clientY: 650 });
+    await d.finish();
+    assert.equal(d.x, x);
+    assert.equal(caught, 0);
+    for (let time = 0; time < 500; time += 16) d.tick(time);
+    assert.ok(d.vy > 500, 'gravity accelerates the torn canopy instead of floating');
+    for (let time = 500; time < 3000 && !d.disposed; time += 16) d.tick(time);
+    assert.equal(d.disposed, true);
+    assert.deepEqual(reasons, ['disconnected']);
+    assert.equal(manager.deliveries.size, 1);
+    assert.equal(healthy.disposed, false);
+});
+
+test('disconnect during box entry cancels acceptance and returns the visual to free fall', async () => {
+    const { api, elements } = setup();
+    let caught = 0, rejectAnimation;
+    const d = api.dropParachute([], 'file', { onCatch: () => caught++ });
+    d.element.animate = () => ({
+        finished: new Promise((_, reject) => { rejectAnimation = reject; }),
+        cancel() { rejectAnimation(Error('cancelled')); }
+    });
+    const entering = d.finish();
+    d.disconnect();
+    await entering;
+    assert.equal(caught, 0);
+    assert.equal(d.receiving, false);
+    assert.equal(d.unavailable, true);
+    assert.equal(d.disposed, false);
+    assert.equal(d.element.parent, elements['.airspace']);
+    d.cancel();
+});
+
 test('an offer falling out of view expires once', () => {
     const { api } = setup();
     const reasons = [];
