@@ -50,8 +50,11 @@ address cannot request microphone and location access in most browsers.
 2. Allow **both microphone and location**. Neither is requested on page load.
 3. Wait at least **five seconds after both permissions succeed**. The scanner
    also waits for MeshClient's first audio feature packet and server readiness.
-   The logo parachute approaches for four seconds, then softly bumps the camera
-   into a one-second pan down. No sound effects or progress bar are added.
+   The logo parachute moves immediately and approaches smoothly for 3.5 seconds,
+   remaining fully visible for most of that time. Its cloud and the camera lift
+   together for 0.2 seconds, pause for 0.3 seconds, then the wind carries the
+   parachute upward as the camera falls into the scene over a full second.
+   No sound effects or progress bar are added.
 4. The nearby-device list opens. Open Parachute on another device, follow the
    same steps, and wait for the room match and name exchange.
 5. Click **Drop parachute** to offer files or a link to everyone currently nearby.
@@ -108,15 +111,24 @@ exchanged with matched devices through `relayMessage()`. JSON transfer messages
 use `relayMessage()` and binary file chunks use `relay()`. Files pass through the
 hosted server rather than a PeerJS/WebRTC data channel.
 
-`warmup.js` owns the approaching logo parachute, swaying hold, soft camera bump,
+`warmup.js` owns the approaching logo parachute, cloud contact, soft camera bump,
 and pan. `welcome.js` starts it on `discovery-warmup-start` after both permissions
-are accepted. `discovery-scanner-ready` releases the final approach once the hosted
-scanner is ready. A slow startup keeps the parachute swaying after the first
-3.5 seconds, then plays the final half-second approach and one-second descent.
+are accepted. The full silhouette fits for most of the 3.5-second approach.
+Growth eases to a stop at contact and stays constant during the connected knock,
+short stun, and wind lift. After the knock and stunned pause,
+`discovery-scanner-ready` allows the full
+one-second camera fall. A slow startup extends the stunned hold until the hosted
+scanner is ready, rather than rushing the fall or exposing sharing early.
 `discovery-warmup-end` still means both the full five seconds and MeshClient
 readiness have completed; it does not imply a nearby match. Failures and page
 exit cancel all effects and remove the overlay. Reduced-motion mode preserves
 the permission timing with fades instead of zooming, swaying, or moving the camera.
+
+At cloud contact, a brief glint and spiderweb cracks spread across the camera
+lens. The cracks stay fixed to the screen through the stun, then fade during
+the downward pan. They never intercept pointer input and are removed on
+completion, errors, or page exit. Reduced-motion mode omits the glint and crack
+expansion. The local SVG artwork is served as `lens-cracks.svg`.
 
 ## How file and link sharing works
 
@@ -205,7 +217,10 @@ To exercise the real hosted detector and audio/WASM pipeline, run
 `node tests/detector-preview.cjs` and open `http://localhost:3002`. It uses generated
 sound and a test position at 0,0, which are sent to the hosted detector; it does
 not access real sensors. Add `?location-timeout=1` to test the location-error UI.
-Add `?slow-scanner=1` to delay scanner readiness and inspect the extended sway.
+Add `?slow-scanner=1` to delay scanner readiness and inspect the extended stunned hold.
+Add `?inspect-flight=1` to pause late in the approach and inspect the silhouette;
+**Continue animation preview** resumes the normal knock and wind lift.
+Use `?inspect-glass=1` instead to pause at impact and inspect the cracked lens.
 
 ## Animation API
 

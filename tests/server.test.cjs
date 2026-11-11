@@ -23,6 +23,7 @@ test('serves nearby discovery and sharing without loading PeerJS in the app', as
     for (const file of [
         'style.css',
         'favicon.svg',
+        'lens-cracks.svg',
         'background.css',
         'parachute.js',
         'connection.js',

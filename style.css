@@ -181,10 +181,42 @@ a {
     position: fixed;
     z-index: 8;
     pointer-events: none;
-    transform-origin: 50% 25%;
+    transform-origin: 50% 80%;
     will-change: transform, opacity;
 }
 .warmup-parachute .brand-icon { display: block; width: 100%; height: 100%; }
+.warmup-lens-glass {
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    pointer-events: none;
+    opacity: 0;
+}
+.warmup-lens-cracks { display: block; width: 100%; height: 100%; }
+.warmup-lens-glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, #fffaf099, transparent 65%);
+    opacity: 0;
+}
+.is-camera-knocked .warmup-lens-glass { opacity: 1; }
+.is-camera-knocked .warmup-lens-cracks { animation: lens-crack-spread .18s ease-out both; }
+.is-camera-knocked .warmup-lens-glass::before { animation: lens-impact-glint .2s ease-out both; }
+.is-camera-panning .warmup-lens-glass { animation: lens-glass-clear 1s ease-in forwards; }
+@keyframes lens-crack-spread {
+    from { clip-path: circle(0 at 50% 50%); }
+    to { clip-path: circle(100% at 50% 50%); }
+}
+@keyframes lens-impact-glint { from { opacity: .65; } to { opacity: 0; } }
+@keyframes lens-glass-clear {
+    0%, 15% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .is-camera-knocked .warmup-lens-cracks { animation: none; }
+    .is-camera-knocked .warmup-lens-glass::before { animation: none; }
+}
 .is-warming .wordmark .brand-icon { visibility: hidden; }
 .is-camera-panning .wordmark { transition: transform 1s cubic-bezier(.3,0,.2,1); }
 .welcome-active.is-camera-panning:not(.has-entered) .wordmark { transform: none; }

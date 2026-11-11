@@ -9,6 +9,7 @@ const assets = new Map([
     ['/index.html', ['index.html', 'text/html']],
     ['/about.html', ['about.html', 'text/html']],
     ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
+    ['/lens-cracks.svg', ['lens-cracks.svg', 'image/svg+xml']],
     ['/style.css', ['style.css', 'text/css']],
     ['/background.css', ['background.css', 'text/css']],
     ['/about.css', ['about.css', 'text/css']],

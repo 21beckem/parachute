@@ -51,6 +51,23 @@ window.loadParachuteMesh = async () => {
     } }) };
 };
 `;
+const inspectFlight = `
+const Flight = window.ParachuteWelcomeFlight;
+window.ParachuteWelcomeFlight = class extends Flight {
+    constructor() {
+        super();
+        setTimeout(() => {
+            if (!this.active) return;
+            this.effects.forEach(effect => effect.pause());
+            const resume = document.createElement('button');
+            resume.textContent = 'Continue animation preview';
+            resume.style.cssText = 'position:fixed;bottom:24px;left:24px;z-index:9;padding:12px';
+            resume.addEventListener('click', () => { this.effects.forEach(effect => effect.play()); resume.remove(); });
+            document.body.append(resume);
+        }, new URLSearchParams(location.search).has('inspect-glass') ? 3750 : 2600);
+    }
+};
+`;
 function createDetectorPreview({ relayTest = false } = {}) {
     const server = createParachuteServer();
     const serve = server.listeners('request')[0];
@@ -62,6 +79,7 @@ function createDetectorPreview({ relayTest = false } = {}) {
             return res.end(readFileSync(path.join(__dirname, '../index.html'), 'utf8')
                 .replace('<title>Parachute</title>', '<title>Parachute · real detector test</title><script src="/synthetic-sensors.js"></script>')
                 .replace('<script src="connection.js', `${relayTest ? '<script src="/relay-discovery.js" defer></script>' : ''}${url.searchParams.has('slow-scanner') ? '<script src="/slow-scanner.js" defer></script>' : ''}<script src="connection.js`)
+                .replace('<script src="welcome.js', `${url.searchParams.has('inspect-flight') || url.searchParams.has('inspect-glass') ? '<script src="/inspect-flight.js" defer></script>' : ''}<script src="welcome.js`)
                 .replace('<body>', '<body><p style="position:fixed;bottom:0;right:0;z-index:20;background:white;color:black;margin:0;padding:4px;font-size:12px">Test: real detector, synthetic audio and location</p>'));
         }
         if (url.pathname === '/synthetic-sensors.js') {
@@ -71,6 +89,10 @@ function createDetectorPreview({ relayTest = false } = {}) {
         if (url.pathname === '/slow-scanner.js') {
             res.setHeader('Content-Type', 'text/javascript');
             return res.end(slowScanner);
+        }
+        if (url.pathname === '/inspect-flight.js') {
+            res.setHeader('Content-Type', 'text/javascript');
+            return res.end(inspectFlight);
         }
         if (relayTest && url.pathname === '/relay-discovery.js') {
             res.setHeader('Content-Type', 'text/javascript');
