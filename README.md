@@ -127,10 +127,14 @@ handles the content protocol independently of the animations.
 3. **Chunks:** read files in 64 KiB slices with `File.slice().arrayBuffer()`.
    Send one binary slice at a time and wait for a `chunk-received` reply before
    reading the next. This keeps queued data bounded and supplies progress.
+   The recipient sees a bobbing parcel and a real percentage while the file
+   arrives. Each incoming transfer has its own indicator.
 4. **Finish:** the receiver checks every file's byte count, rebuilds each `File`,
    adds it to Received, and sends `complete`. Only then does the sender report
    delivered. Byte counts catch incomplete app-level transfers; the relay carries binary
-   data over the service connection.
+   data over the service connection. A large icon of the completed delivery
+   appears and immediately zooms into the box; only then does the box play its
+   receipt effect. Catching the initial metadata parachute is not a file receipt.
 5. **Save:** `URL.createObjectURL(file)` creates a local download address for an
    anchor with the `download` attribute. The receiver clicks it to save. Links
    allow only HTTP/HTTPS and open only when clicked. Remote text uses
@@ -145,8 +149,19 @@ labels while preserving original download names. Removing an earlier duplicate
 does not renumber the remaining items. Preview and download share one object URL,
 which is released when the entry is removed or the page exits.
 
+While an offer or transfer is active, each peer is checked every two seconds
+with a three-second reachability timeout. A lost room-sound match alone does
+not withdraw an available file. A confirmed relay failure or departure notice
+removes that sender's parachute and any incomplete loading indicator immediately.
+Normal exits send a best-effort departure notice before disconnecting; sudden
+network loss can take about five seconds to detect (longer if the browser
+throttles background timers). Completed Received items stay available locally.
+
 For a sensor-free Received design preview, run `node tests/received-preview.cjs`
 and open `http://localhost:3004`. It uses sample files and the project's mockup image.
+Add `?arrival-preview` to pause the large icon for inspection, then use
+**Finish arrival preview** to watch it zoom into the box. This pause control
+exists only in the local fixture.
 
 The version-2 messages are `offer`, `accept`, `decline`, `chunk`,
 `chunk-received`, `finish`, `complete`, and `cancel`. A random transfer ID ties
@@ -252,3 +267,7 @@ the sender reports one received and one expired. Send a link back and catch it.
 The **Hide test room match** control in fixture dialogs can also test an active
 transfer surviving a temporary discovery change.
 The matching controls exist only in this local test harness.
+Open the sender with `?relay-delay=1500` to delay each binary chunk by 1.5 seconds
+and inspect the loading progress. Uncaught offers still appear without that delay.
+Send another offer, then stop discovery on the sender: outstanding parachutes
+should disappear on both recipients, and completed downloads should remain.

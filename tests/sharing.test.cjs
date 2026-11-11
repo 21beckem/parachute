@@ -2,6 +2,93 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { setup, deferred, flush } = require('./helpers/mesh-app.cjs');
 
+test('metadata reaches every peer before reads; a caught slow file shows progress then flies into the box', async t => {
+    const { client, start, match } = setup(t);
+    const arrival = deferred(), lastChunk = deferred();
+    const a = client(1), b = client(2, { arrival }), c = client(3);
+    for (const app of [a, b, c]) await start(app);
+    match(a, b); match(a, c); await flush();
+    let reads = 0;
+    const file = { name: 'large.bin', type: 'application/octet-stream', size: 131072,
+        slice(start, end) { return { async arrayBuffer() {
+            reads++;
+            if (start) await lastChunk.promise;
+            return new Uint8Array(end - start).buffer;
+        } }; }
+    };
+    const send = a.sharing.send({ files: [file] }); await flush();
+    assert.equal(reads, 0);
+    assert.equal(b.deliveries.size, 1); assert.equal(c.deliveries.size, 1);
+    b.catchOffer(1); await flush();
+    const pending = b.sharing.offers.get(1);
+    assert.equal(pending.progress.value, .5);
+    assert.match(pending.caption.textContent, /50%/);
+    assert.equal(b.sharing.entries.size, 0);
+    assert.equal(c.sharing.offers.get(1).accepted, false);
+    c.missOffer(1); lastChunk.resolve(); await send; await flush();
+    assert.equal(pending.loading.removed, true);
+    assert.equal(b.sharing.entries.size, 1);
+    assert.equal(b.sharing.arrivals.size, 1, 'the big completed icon is animating');
+    assert.equal(b.receipts.length, 0, 'box receipt waits for the completed-icon flight');
+    arrival.resolve(); await flush();
+    assert.equal(b.sharing.arrivals.size, 0);
+    assert.equal(b.receipts.length, 1);
+    assert.equal(a.mesh.calls.some(call => call.type === 'binary' && call.to === 3), false);
+});
+
+test('sender departure removes all uncaught parachutes without waiting for offer expiry', async t => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2), c = client(3);
+    for (const app of [a, b, c]) await start(app);
+    match(a, b); match(a, c); await flush();
+    const send = a.sharing.send({ files: [new File(['bytes'], 'file.txt')] }); await flush();
+    a.c.stopDiscovery();
+    a.c.destroy(); // A subsequent pagehide must not interrupt the departure notices.
+    await flush(); await send;
+    assert.equal(a.reloads, 1);
+    assert.equal(a.mesh.calls.filter(call => call.msg?.type === 'parachute:leaving:v1').length, 2);
+    for (const app of [b, c]) {
+        assert.equal(app.sharing.offers.size, 0);
+        assert.equal(app.deliveries.size, 0);
+        assert.equal(app.sharing.entries.size, 0);
+    }
+});
+
+test('silent sender loss is detected even while the nearby list is stale', async t => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2);
+    await start(a); await start(b); match(a, b); await flush();
+    const send = a.sharing.send({ url: 'https://example.com' }); await flush();
+    const delivery = b.sharing.offers.get(1).delivery;
+    a.mesh.connected = false;
+    await b.advance(2000);
+    assert.equal(b.mesh.peers.includes(1), true, 'no detector peerRemoved event was needed');
+    assert.equal(b.sharing.offers.size, 0);
+    assert.equal(delivery.disposed, true);
+    delivery.options.onCatch();
+    assert.equal(b.sharing.entries.size, 0);
+    a.sharing.cancel(); await send;
+});
+
+test('lost reachability during a partial file clears its loading indicator and never saves incomplete bytes', async t => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2), hold = deferred();
+    await start(a); await start(b); match(a, b); await flush();
+    const send = a.sharing.send({ files: [{ name: 'partial.bin', type: '', size: 131072,
+        slice(start, end) { return { async arrayBuffer() { if (start) await hold.promise; return new Uint8Array(end - start).buffer; } }; }
+    }] }); await flush();
+    b.catchOffer(1); await flush();
+    const loading = b.sharing.offers.get(1).loading;
+    const relay = b.mesh.relayMessage.bind(b.mesh);
+    b.mesh.relayMessage = (to, msg) => msg.type === 'parachute:transfer-check:v1' ? new Promise(() => {}) : relay(to, msg);
+    await b.advance(2000); await b.advance(3000);
+    assert.equal(loading.removed, true);
+    assert.equal(b.sharing.offers.size, 0);
+    assert.equal(b.sharing.entries.size, 0);
+    assert.equal(b.sharing.arrivals.size, 0);
+    a.sharing.cancel(); hold.resolve(); await send;
+});
+
 test('received packages use box artwork and duplicate names keep distinct labels and original downloads', t => {
     const { client } = setup(t);
     const app = client(1);

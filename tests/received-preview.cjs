@@ -13,6 +13,17 @@ sharing.delivered({ sender: 'Sam', kind: 'files', files: [picture, new File(['Tr
 sharing.delivered({ sender: 'Spencer', kind: 'files', files: [new File(['Other notes'], 'notes.txt', { type: 'text/plain' })] });
 sharing.delivered({ sender: 'Michael', kind: 'link', files: [], url: 'https://example.com/project' });
 sharing.receivedDialog.showModal();
+if (new URLSearchParams(location.search).has('arrival-preview')) {
+    sharing.receivedDialog.close();
+    sharing.animateArrival({ sender: 'Sam', kind: 'files', files: [picture] });
+    const { flight } = [...sharing.arrivals][0];
+    setTimeout(() => flight.pause(), 300);
+    const finish = document.createElement('button');
+    finish.textContent = 'Finish arrival preview';
+    finish.style.cssText = 'position:fixed;top:110px;left:20px;z-index:8;padding:12px';
+    finish.addEventListener('click', () => { flight.play(); finish.remove(); });
+    document.body.append(finish);
+}
 `;
 const photo = readFileSync(path.join(__dirname, '../mockups/chatgpt-mockup-sep-21.png')).toString('base64');
 const server = createParachuteServer();

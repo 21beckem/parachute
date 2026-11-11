@@ -57,7 +57,11 @@
                 timer = setInterval(announce, 1000);
                 return result;
             },
-            relay: (...args) => real.relay(...args),
+            async relay(...args) {
+                const delay = Math.min(3000, Math.max(0, Number(new URLSearchParams(location.search).get('relay-delay')) || 0));
+                if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+                return real.relay(...args);
+            },
             relayMessage: (...args) => real.relayMessage(...args),
             disconnect() { clearInterval(timer); bus.close(); real.disconnect(); }
         } };

@@ -239,8 +239,9 @@ test('receiving animates into the box, cleans up just that delivery, and preserv
 });
 
 test('offer acceptance fires after the entry animation, never before it', async () => {
-    const { api } = setup();
-    let caught = 0, expired = 0;
+    const { api, manager } = setup();
+    let caught = 0, expired = 0, received = 0;
+    manager.box.addEventListener('file-received', () => received++);
     const delivery = api.dropParachute([], 'file', {
         onCatch: () => caught++, onExpire: () => expired++
     });
@@ -249,6 +250,7 @@ test('offer acceptance fires after the entry animation, never before it', async 
     await receipt;
     assert.equal(caught, 1);
     assert.equal(expired, 0);
+    assert.equal(received, 0, 'catching a metadata offer must not announce that a file arrived');
     delivery.cancel();
     assert.equal(expired, 0);
 });

@@ -1,6 +1,10 @@
 // Only MeshClient is imported. Its modules, worker, and model load automatically.
 const IDENTITY = 'parachute:identity:v1';
 const WARMUP_MS = 5000;
+const TRANSFER_CHECK = 'parachute:transfer-check:v1';
+const DEPARTURE = 'parachute:leaving:v1';
+const CHECK_INTERVAL_MS = 2000;
+const CHECK_TIMEOUT_MS = 3000;
 
 class ParachuteConnection {
     constructor() {
@@ -69,10 +73,7 @@ class ParachuteConnection {
                 this.stopHandshake(uid);
                 const channel = this.channels.get(uid);
                 if (channel && window.parachuteSharing?.hasActiveTransfer(uid)) {
-                    void this.mesh.relayMessage(uid, { type: 'parachute:transfer-check:v1' }).catch(() => {
-                        if (this.channels.get(uid) === channel && !this.mesh.peers.includes(uid))
-                            this.closePeer(uid, 'That device is no longer reachable.');
-                    });
+                    void this.checkPeer(uid, channel);
                 } else {
                     this.devices.delete(uid);
                     this.closePeer(uid);
@@ -239,6 +240,12 @@ class ParachuteConnection {
 
     receiveMessage({ from, msg }) {
         if (!Number.isInteger(from) || !msg) return;
+        if (msg.type === DEPARTURE) {
+            this.devices.delete(from);
+            this.closePeer(from, 'That device disconnected. Its unfinished transfers were removed.');
+            return;
+        }
+        if (msg.type === TRANSFER_CHECK) return;
         if (msg.type === IDENTITY) {
             if (typeof msg.name !== 'string' || !msg.name.trim()) return;
             if (!this.devices.has(from) && this.devices.size >= 100) return;
@@ -276,6 +283,7 @@ class ParachuteConnection {
         let queue = Promise.resolve();
         channel.send = packet => {
             if (!channel.open) throw Error('The device disconnected.');
+            this.monitorPeer(uid, channel);
             queue = queue.then(async () => {
                 if (!channel.open) return;
                 if (packet.type === 'chunk') {
@@ -289,19 +297,53 @@ class ParachuteConnection {
             return queue;
         };
         this.channels.set(uid, channel);
+        this.monitorPeer(uid, channel);
         return channel;
+    }
+
+    monitorPeer(uid, channel) {
+        if (channel.monitor || !channel.open) return;
+        channel.monitor = setTimeout(async () => {
+            channel.monitor = null;
+            if (this.channels.get(uid) !== channel || !window.parachuteSharing?.hasActiveTransfer(uid)) return;
+            await this.checkPeer(uid, channel);
+            if (this.channels.get(uid) === channel) this.monitorPeer(uid, channel);
+        }, CHECK_INTERVAL_MS);
+    }
+
+    async checkPeer(uid, channel) {
+        if (channel.checking || !channel.open) return;
+        channel.checking = true;
+        let timer;
+        try {
+            await Promise.race([
+                this.mesh.relayMessage(uid, { type: TRANSFER_CHECK }, { timeout: CHECK_TIMEOUT_MS }),
+                new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(Error('Device is no longer reachable.')), CHECK_TIMEOUT_MS);
+                })
+            ]);
+        } catch {
+            if (this.channels.get(uid) === channel)
+                this.closePeer(uid, 'That device disconnected. Its unfinished transfers were removed.');
+        } finally {
+            clearTimeout(timer);
+            channel.checking = false;
+        }
     }
 
     closePeer(uid, message) {
         const channel = this.channels.get(uid);
-        if (channel) channel.open = false;
+        if (channel) { channel.open = false; clearTimeout(channel.monitor); }
         this.channels.delete(uid);
         window.parachuteSharing?.closePeer(uid);
         this.render(message);
     }
 
     closeAll(message) {
-        for (const channel of this.channels.values()) channel.open = false;
+        for (const channel of this.channels.values()) {
+            channel.open = false;
+            clearTimeout(channel.monitor);
+        }
         this.channels.clear();
         window.parachuteSharing?.reset();
         this.render(message);
@@ -335,18 +377,35 @@ class ParachuteConnection {
     }
 
     destroy() {
+        if (this.destroyed) return this.shutdown;
+        this.destroyed = true;
+        const mesh = this.mesh;
+        // Best effort on a normal exit. Abrupt tab/network loss is covered by
+        // bounded reachability checks while any offer or transfer is active.
+        const notices = mesh?.connected && this.active ? [...this.channels.keys()].map(uid =>
+            mesh.relayMessage(uid, { type: DEPARTURE }, { timeout: 150 }).catch(() => {})
+        ) : [];
         this.generation++;
         this.active = this.ready = false;
         for (const uid of this.handshakes.keys()) this.stopHandshake(uid);
         this.closeAll();
-        this.mesh?.disconnect();
+        if (notices.length) {
+            this.shutdown = new Promise(resolve => {
+                let ended = false;
+                const disconnect = () => { if (!ended) { ended = true; mesh.disconnect(); resolve(); } };
+                const timer = setTimeout(disconnect, 150);
+                void Promise.allSettled(notices).then(() => { clearTimeout(timer); disconnect(); });
+            });
+        } else mesh?.disconnect();
         for (const unsubscribe of this.unsubscribers) unsubscribe();
         this.unsubscribers = [];
+        return this.shutdown;
     }
 
     stopDiscovery() {
-        this.destroy();
-        location.reload();
+        const closing = this.destroy();
+        if (closing) void closing.then(() => location.reload());
+        else location.reload();
     }
 
 }

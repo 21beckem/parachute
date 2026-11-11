@@ -5,6 +5,7 @@ class ParachuteSharing {
         this.offers = new Map();
         this.entries = new Set();
         this.receivedNames = new Map();
+        this.arrivals = new Set();
         this.busy = false;
         for (const [key, id] of Object.entries({
             shareDialog: 'share-dialog', receivedDialog: 'received-dialog',
@@ -79,11 +80,18 @@ class ParachuteSharing {
         const transport = new window.ParachuteTransfer(channel, {
             onStatus: message => { if (!this.batch) this.status(message); },
             onOffer: offer => this.offer(uid, offer),
+            onReceiveProgress: progress => {
+                const pending = this.offers.get(uid);
+                if (!pending?.loading) return;
+                pending.progress.value = progress;
+                pending.caption.textContent = `Receiving from ${pending.offer.sender} · ${Math.round(progress * 100)}%`;
+            },
             onComplete: result => {
                 const pending = this.offers.get(uid);
                 if (!pending?.accepted) return;
                 this.clearOffer(uid);
                 this.delivered(result);
+                this.animateArrival(result);
             }
         });
         this.transports.set(uid, transport);
@@ -120,6 +128,7 @@ class ParachuteSharing {
         this.offers.set(uid, item);
         const preview = offer.kind === 'link' ? [] : offer.files.map(file => ({ name: file.name, type: file.mime }));
         const type = offer.kind === 'link' ? 'link' : window.ParachuteAnimation.typeOf(preview);
+        item.type = type;
         const title = offer.kind === 'link' ? 'Website link' : offer.files.length === 1
             ? offer.files[0].name : `${offer.files.length} files`;
         item.delivery = window.animation.dropParachute(preview, type, {
@@ -147,6 +156,8 @@ class ParachuteSharing {
         }
         item.accepted = true;
         clearTimeout(item.timer);
+        this.showReceiving(item);
+        window.ParachuteAnimation.announce?.('Parachute caught. Requesting your delivery…');
         // Called only after the entry animation finishes inside the box.
         item.transport.accept();
     }
@@ -162,6 +173,54 @@ class ParachuteSharing {
         this.offers.delete(uid);
         clearTimeout(item.timer);
         item.delivery?.cancel();
+        item.loading?.remove();
+    }
+
+    showReceiving(item) {
+        const loading = document.createElement('div');
+        loading.className = 'incoming-transfer';
+        loading.setAttribute('role', 'status');
+        const art = this.artwork('other');
+        art.classList.add('transfer-mascot');
+        const caption = document.createElement('strong');
+        caption.textContent = `Requesting from ${item.offer.sender}…`;
+        const progress = document.createElement('progress');
+        progress.max = 1;
+        progress.value = 0;
+        progress.setAttribute('aria-label', `Transfer from ${item.offer.sender}`);
+        loading.append(art, caption, progress);
+        document.getElementById('incoming-transfers').append(loading);
+        Object.assign(item, { loading, caption, progress });
+    }
+
+    animateArrival(result) {
+        const icon = document.createElement('div');
+        icon.className = 'received-arrival';
+        icon.setAttribute('aria-hidden', 'true');
+        const type = result.kind === 'link' ? 'link' : result.files.length > 1
+            ? 'other' : window.ParachuteAnimation.typeOf(result.files);
+        icon.append(this.artwork(type));
+        document.getElementById('delivery-effects').append(icon);
+        const box = document.querySelector('.drop-box').getBoundingClientRect();
+        const dx = (box.left + box.right) / 2 - innerWidth / 2;
+        const dy = (box.top + box.bottom) / 2 - innerHeight * .4;
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const flight = icon.animate(reduced ? [{ opacity: 1 }, { opacity: 0 }] : [
+            { transform: 'translate(-50%, -50%) scale(.7)', opacity: 0, offset: 0 },
+            { transform: 'translate(-50%, -50%) scale(1.08)', opacity: 1, offset: .16 },
+            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1, offset: .32 },
+            { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.12)`, opacity: 0, offset: 1 }
+        ], { duration: reduced ? 150 : 1100, easing: 'ease-in-out', fill: 'forwards' });
+        const arrival = { icon, flight };
+        this.arrivals.add(arrival);
+        void flight.finished.then(() => {
+            if (!this.arrivals.has(arrival)) return;
+            window.animation.receiveFileInBox(result.files);
+            this.updateCount();
+        }, () => {}).finally(() => {
+            icon.remove();
+            this.arrivals.delete(arrival);
+        });
     }
 
     batchStatus(batch) {
@@ -345,14 +404,24 @@ class ParachuteSharing {
     }
 
     closePeer(uid) {
+        const hadIncoming = this.offers.has(uid);
         const transport = this.transports.get(uid);
         this.transports.delete(uid);
         transport?.close();
         this.clearOffer(uid);
+        if (hadIncoming && !this.batch) {
+            this.status('The sender is no longer available. Its unfinished delivery was removed.');
+            window.ParachuteAnimation.announce?.('The sender disconnected. Delivery removed.');
+        }
         this.sync();
     }
 
     reset() {
+        for (const arrival of this.arrivals) {
+            arrival.flight.cancel();
+            arrival.icon.remove();
+        }
+        this.arrivals.clear();
         for (const uid of [...this.transports.keys()]) this.closePeer(uid);
         this.batch = null;
         this.busy = false;

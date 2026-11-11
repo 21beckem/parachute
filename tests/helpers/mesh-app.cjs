@@ -9,9 +9,10 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a, b)
 
 function setup(t) {
     const clients = new Map();
-    function client(uid, { audio, geo, beginResult, loadFailure } = {}) {
+    function client(uid, { audio, geo, beginResult, loadFailure, arrival } = {}) {
         const events = [], nodes = new Map(), timers = new Map(), deliveries = new Set();
         const permissionCalls = { audio: 0, location: 0, locationOptions: null };
+        const receipts = [];
         let now = 0, nextTimer = 0, stopped = 0, reloads = 0, launches = 0;
         const panel = { dataset: {}, contains: () => false, querySelector: () => ({ focus() {} }) };
         const element = id => {
@@ -21,6 +22,8 @@ function setup(t) {
                 addEventListener(event, callback) { this.listeners[event] = callback; },
                 setAttribute(key, value) { this[key] = value; },
                 removeAttribute(key) { delete this[key]; },
+                getBoundingClientRect: () => ({ left: 500, right: 705, top: 580, bottom: 752 }),
+                animate() { return { finished: arrival?.promise || Promise.resolve(), cancel() {} }; },
                 closest: () => panel,
                 append(...items) { this.children.push(...items); },
                 prepend(item) { this.children.unshift(item); },
@@ -73,11 +76,13 @@ function setup(t) {
         };
         const window = {
             isSecureContext: true,
+            matchMedia: () => ({ matches: false }),
             addEventListener() {},
             dispatchEvent(event) { events.push({ type: event.type, detail: event.detail, at: now }); },
             loadParachuteMesh: async () => { if (loadFailure) throw Error('offline'); return { MeshClient: mesh }; },
             ParachuteAnimation: { deliveries, typeOf: () => 'file' },
             animation: {
+                receiveFileInBox(files) { receipts.push(files); },
                 async launchRocket() { launches++; return true; },
                 dropParachute(preview, type, options) {
                     const delivery = {
@@ -107,14 +112,14 @@ function setup(t) {
             },
             location: { reload: () => reloads++ },
             CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
-            Date: Clock, ArrayBuffer, Uint8Array, File, Blob, URL, crypto: webcrypto,
+            Date: Clock, ArrayBuffer, Uint8Array, File, Blob, URL, crypto: webcrypto, innerWidth: 1200, innerHeight: 800,
             setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, at: now + ms }); return id; },
             clearTimeout(id) { timers.delete(id); }, console: { error() {} }
         };
         vm.createContext(context);
         for (const source of sources) vm.runInContext(source, context);
         const result = {
-            c: window.parachuteConnection, sharing: window.parachuteSharing, window, mesh, events, element, nodes, deliveries, permissionCalls,
+            c: window.parachuteConnection, sharing: window.parachuteSharing, window, mesh, events, element, nodes, deliveries, permissionCalls, receipts,
             browserAPIs: context.navigator,
             get stopped() { return stopped; }, get reloads() { return reloads; }, get launches() { return launches; },
             async advance(ms) {

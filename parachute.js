@@ -525,8 +525,8 @@ class ParachuteDelivery {
         }
         if (this.disposed) return;
         this.cancel('received');
-        Animation.receiveFileInBox(this.files);
-        this.options.onCatch?.();
+        if (this.options.onCatch) this.options.onCatch();
+        else Animation.receiveFileInBox(this.files);
     }
     cancel(reason = 'cancelled') {
         if (this.disposed) return;

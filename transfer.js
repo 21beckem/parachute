@@ -196,6 +196,7 @@ class ParachuteTransfer {
         this.watchIncoming();
         this.packet('accept', state.id);
         this.hooks.onOffer?.(null);
+        this.hooks.onReceiveProgress?.(0);
         this.hooks.onStatus?.('Receiving your friend’s transfer…', 0);
     }
 
@@ -307,6 +308,7 @@ class ParachuteTransfer {
                 sequence: data.sequence
             });
             const total = state.files.reduce((sum, file) => sum + file.size, 0);
+            this.hooks.onReceiveProgress?.(total ? state.received / total : 1);
             this.hooks.onStatus?.(
                 `Receiving ${Math.round((state.received / total) * 100)}%`,
                 state.received / total
