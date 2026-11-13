@@ -28,12 +28,16 @@ class ParachuteSharing {
             event.preventDefault();
             void this.send({ url: this.shareLink.value.trim() });
         });
-        this.showReceived.addEventListener('click', () => this.receivedDialog.showModal());
         const box = document.querySelector('.drop-box');
         box.setAttribute('role', 'button');
         box.setAttribute('tabindex', '0');
-        box.addEventListener('click', () => this.receivedDialog.showModal());
+        box.addEventListener('click', event => {
+            // A caught delivery can still be inside the box during its entry animation.
+            if (event.defaultPrevented || event.target.closest('.falling-parachute')) return;
+            this.receivedDialog.showModal();
+        });
         box.addEventListener('keydown', event => {
+            if (event.target !== box) return;
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             this.receivedDialog.showModal();

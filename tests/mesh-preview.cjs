@@ -50,8 +50,8 @@ class FixtureMesh {
 export const MeshClient = new FixtureMesh();
 `;
 const permissions = `
-Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => ({getTracks: () => [{stop() {}}]}) });
-Object.defineProperty(navigator.geolocation, 'getCurrentPosition', { value: (resolve) => resolve({coords: {latitude: 0, longitude: 0}}) });
+Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { configurable: true, writable: true, value: async () => ({getTracks: () => [{stop() {}}]}) });
+Object.defineProperty(navigator.geolocation, 'getCurrentPosition', { configurable: true, writable: true, value: (resolve) => resolve({coords: {latitude: 0, longitude: 0}}) });
 `;
 const server = createParachuteServer({ fetchMesh: async () => new Response(fixture) });
 const serve = server.listeners('request')[0];

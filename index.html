@@ -11,15 +11,15 @@
         <title>Parachute</title>
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="background.css?v=welcome-flight-1" />
-        <link rel="stylesheet" href="style.css?v=lens-crack-5" />
+        <link rel="stylesheet" href="style.css?v=smooth-approach-1" />
         <script src="parachute.js?v=torn-parachute-1" defer></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
         <script src="transfer.js?v=request-file-1" defer></script>
         <script src="mesh-loader.js?v=request-file-1" defer></script>
         <script src="connection.js?v=welcome-flight-1" defer></script>
-        <script src="warmup.js?v=lens-crack-5" defer></script>
+        <script src="warmup.js?v=smooth-approach-1" defer></script>
         <script src="welcome.js?v=welcome-flight-1" defer></script>
-        <script src="sharing.js?v=torn-parachute-1" defer></script>
+        <script src="sharing.js?v=received-box-1" defer></script>
     </head>
     <body>
         <!-- Reusable artwork for the branding and draggable delivery. -->
@@ -488,8 +488,12 @@
                 </div>
                 <div
                     class="drop-box"
-                    role="img"
-                    aria-label="Open receiving box"
+                    role="button"
+                    tabindex="0"
+                    aria-labelledby="show-received"
+                    aria-haspopup="dialog"
+                    aria-controls="received-dialog"
+                    title="Open received items"
                 >
                     <span class="box-back" aria-hidden="true"></span>
                     <span class="box-flap flap-left" aria-hidden="true"></span>
@@ -504,7 +508,7 @@
                                 stroke-width="6"
                             />
                         </svg>
-                        <span> Incoming parachutes </span>
+                        <span id="show-received">Received (0)</span>
                     </span>
                 </div>
                 <p
@@ -520,7 +524,6 @@
             </a>
         </footer>
         <div class="transfer-tools">
-            <button id="show-received" type="button">Received (0)</button>
             <p id="transfer-status" role="status" aria-live="polite" hidden></p>
             <button id="cancel-transfer" type="button" hidden>Cancel send</button>
         </div>
