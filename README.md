@@ -67,8 +67,11 @@ does not stop the others. Devices discovered after sending do not receive that o
 If a room match disappears during an offer or transfer, Parachute keeps that sharing
 connection and checks whether the relay can still reach the recipient. Its row
 is marked "room signal changed"; detector results themselves are not changed.
-Actual relay failures, server disconnection, and transfer timeouts still stop
-the transfer. New devices must still be discovered before they can send offers.
+Temporary relay failures retry without throwing away acknowledged chunks. A
+30-second sound-match grace period keeps previously discovered people eligible
+for offers while a group gets ready. Accepted offers and deliveries outlive that
+discovery countdown. Server disconnection still requires a reload; the upstream
+MeshClient has no public socket-reconnect API. New devices must still be discovered.
 **Cancel send** withdraws outstanding outgoing offers. **Stop discovery** reloads the page to release the
 microphone, because the upstream singleton does not expose microphone cleanup or
 reconnection. Save received files before stopping or reloading.
@@ -135,8 +138,13 @@ handles the content protocol independently of the animations.
    finishes does the recipient send approval. There is no separate Accept dialog.
    Falling offscreen or waiting 60 seconds expires the offer.
 3. **Chunks:** read files in 64 KiB slices with `File.slice().arrayBuffer()`.
-   Send one binary slice at a time and wait for a `chunk-received` reply before
-   reading the next. This keeps queued data bounded and supplies progress.
+   Keep up to eight binary slices in flight, acknowledging each received chunk.
+   This bounds queued data to 512 KiB per outgoing recipient and avoids a full
+   network wait between every slice. A receiver advertises its supported window
+   in `accept`; older pages receive one chunk at a time. Out-of-order chunks are
+   buffered within the window. Missing replies retry every three seconds with a
+   30-second deadline per chunk. Duplicate chunks are acknowledged without being
+   appended again, and a repeated `finish` cannot create a duplicate package.
    The recipient sees a bobbing parcel and a real percentage while the file
    arrives. Each incoming transfer has its own indicator.
 4. **Finish:** the receiver checks every file's byte count, rebuilds each `File`,
@@ -159,15 +167,23 @@ labels while preserving original download names. Removing an earlier duplicate
 does not renumber the remaining items. Preview and download share one object URL,
 which is released when the entry is removed or the page exits.
 
-While an offer or transfer is active, each peer is checked every two seconds
-with a three-second reachability timeout. A lost room-sound match alone does
-not withdraw an available file. A confirmed relay failure or departure notice
-withdraws that sender's offer and any incomplete loading indicator immediately.
+People whose sound match disappears remain eligible for new offers for 30 seconds,
+marked "Signal interrupted" in the nearby list. A renewed sound match resets that
+lease; network traffic alone does not extend discovery eligibility. After expiry,
+new offers are blocked, but existing offers and accepted deliveries may finish.
+
+While an offer or transfer is active, idle peers are checked every two seconds
+with a three-second reachability timeout. Successful relay traffic also counts as
+reachability. A failed check shows "Reconnecting" and retains the transfer for a
+separate 30-second recovery period rather than immediately discarding it. An
+explicit departure notice removes the peer immediately, including before any
+offer has been sent. A sustained failure withdraws that sender's offer and any
+incomplete loading indicator.
 The remaining parachute is a disabled visual: its canopy shrinks and develops
 holes, any held pointer is released, and gravity carries it offscreen. It cannot
 be dragged, paused, caught, or downloaded. Other parachutes remain interactive.
 Normal exits send a best-effort departure notice before disconnecting; sudden
-network loss can take about five seconds to detect (longer if the browser
+network loss can take about 35 seconds to remove a delivery (longer if the browser
 throttles background timers). Completed Received items stay available locally.
 
 For a sensor-free Received design preview, run `node tests/received-preview.cjs`
@@ -188,9 +204,11 @@ Limits: 20 files, 100 MiB (shown as 100 MB in the UI) per transfer; 100 MiB tota
 retained or reserved for accepted incoming transfers, and 100 retained transfers per tab.
 At most 20 pending parachutes are shown. Zip ordinary folders
 first. The browser retains received content in memory until Remove, page exit,
-or refresh; save it first. Remove revokes download URLs. Transfers are not resumable. Disconnects, cancellation,
-invalid chunks, or inactivity abort incomplete transfers. There is a 60-second
-acceptance timeout and a 30-second wait for each acknowledgment. A sender using
+or refresh; save it first. Remove revokes download URLs. Progress is retained for
+retries during a live MeshClient session, not persisted across refresh, tab closure,
+or a closed MeshClient socket. Cancellation, invalid chunks, and exhausted recovery
+deadlines abort incomplete transfers. There is a 60-second acceptance timeout and
+a 30-second deadline for each acknowledgment. A sender using
 an old page that does not support this protocol will time out; refresh both pages.
 
 Run `npm test` for nearby discovery, permission timing, consent, binary relay
@@ -199,6 +217,12 @@ use a simulated mesh to test the app independently of live microphone hardware.
 The historical `peerjs-test.html` and `tests/peerjs-browser.cjs` remain as reference
 examples only; the main app no longer loads or uses PeerJS. Real same-room
 matching still needs a two-device check against the hosted service.
+
+With Playwright available, run `node tests/relay-browser.cjs` for a live hosted-relay
+check using synthetic sensors and controlled room matches. It sends ten test files
+during the sound grace period and checks byte integrity, then deliberately loses
+chunk and completion replies to exercise retries and duplicate suppression. Test
+photo/video filenames contain deterministic bytes rather than playable media.
 
 For a browser-only UI check, run `node tests/mesh-preview.cjs` and open
 `http://localhost:3001` in two tabs. This fixture uses fake permissions and a

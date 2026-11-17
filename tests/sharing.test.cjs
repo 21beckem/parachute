@@ -63,6 +63,8 @@ test('silent sender loss is detected even while the nearby list is stale', async
     a.mesh.connected = false;
     await b.advance(2000);
     assert.equal(b.mesh.peers.includes(1), true, 'no detector peerRemoved event was needed');
+    assert.equal(b.sharing.offers.size, 1, 'brief outages retain the offer');
+    await b.advance(30000);
     assert.equal(b.sharing.offers.size, 0);
     assert.equal(delivery.unavailable, true);
     delivery.options.onCatch();
@@ -82,6 +84,8 @@ test('lost reachability during a partial file clears its loading indicator and n
     const relay = b.mesh.relayMessage.bind(b.mesh);
     b.mesh.relayMessage = (to, msg) => msg.type === 'parachute:transfer-check:v1' ? new Promise(() => {}) : relay(to, msg);
     await b.advance(2000); await b.advance(3000);
+    assert.notEqual(loading.removed, true, 'a missed check keeps partial bytes');
+    await b.advance(30000); await b.advance(3000);
     assert.equal(loading.removed, true);
     assert.equal(b.sharing.offers.size, 0);
     assert.equal(b.sharing.entries.size, 0);

@@ -63,7 +63,7 @@ class ParachuteSharing {
     }
 
     sync() {
-        const nearby = this.connection.active ? this.connection.mesh?.peers.length || 0 : 0;
+        const nearby = this.connection.nearbyPeers().length;
         const enabled = nearby > 0 && !this.busy;
         this.connection.send.disabled = !enabled;
         this.sendFiles.disabled = this.sendLink.disabled = !enabled;
@@ -72,7 +72,7 @@ class ParachuteSharing {
     }
 
     open() {
-        if (this.busy || !this.connection.active || !this.connection.mesh?.peers.length) return;
+        if (this.busy || !this.connection.active || !this.connection.nearbyPeers().length) return;
         this.shareFeedback.textContent = 'Everyone currently nearby gets a parachute. Their transfer starts when it enters their box.';
         this.shareDialog.showModal();
     }
@@ -83,6 +83,7 @@ class ParachuteSharing {
         if (!channel) return null;
         const transport = new window.ParachuteTransfer(channel, {
             onStatus: message => { if (!this.batch) this.status(message); },
+            onConnectionStatus: interrupted => this.connectionStatus(uid, interrupted),
             onOffer: offer => this.offer(uid, offer),
             onReceiveProgress: progress => {
                 const pending = this.offers.get(uid);
@@ -228,17 +229,37 @@ class ParachuteSharing {
         });
     }
 
+    connectionStatus(uid, interrupted) {
+        const pending = this.offers.get(uid);
+        if (pending?.loading) pending.caption.textContent = interrupted
+            ? 'Reconnecting… keeping your progress.'
+            : `Receiving from ${pending.offer.sender} · ${Math.round(pending.progress.value * 100)}%`;
+        const record = this.batch?.records.get(uid);
+        if (record && ['waiting', 'sending', 'reconnecting'].includes(record.state)) {
+            let changed = false;
+            if (interrupted && record.state !== 'reconnecting') {
+                record.previousState = record.state;
+                record.state = 'reconnecting';
+                changed = true;
+            } else if (!interrupted && record.state === 'reconnecting') {
+                record.state = record.previousState || 'sending';
+                changed = true;
+            }
+            if (changed) this.batchStatus(this.batch);
+        } else if (interrupted) this.status('Reconnecting… keeping your progress for up to 30 seconds.');
+    }
+
     batchStatus(batch) {
         const counts = {};
         for (const record of batch.records.values()) counts[record.state] = (counts[record.state] || 0) + 1;
-        const labels = { waiting: 'waiting for a catch', sending: 'receiving', delivered: 'received', expired: 'expired', failed: 'unavailable', cancelled: 'cancelled' };
+        const labels = { waiting: 'waiting for a catch', sending: 'receiving', reconnecting: 'reconnecting (keeping progress)', delivered: 'received', expired: 'expired', failed: 'unavailable', cancelled: 'cancelled' };
         const summary = Object.entries(labels).filter(([state]) => counts[state]).map(([state, label]) => `${counts[state]} ${label}`).join(', ');
         this.status(`${batch.records.size} nearby device${batch.records.size === 1 ? '' : 's'}: ${summary}.`);
     }
 
     async send(content) {
         if (this.busy || !this.connection.active) return;
-        const targets = [...this.connection.mesh.peers];
+        const targets = this.connection.nearbyPeers();
         if (!targets.length) return this.status('No nearby devices right now. Try again when someone appears.');
         const sender = window.parachuteProfile?.displayName || 'Someone nearby';
         try { window.ParachuteTransfer.offerFor({ ...content, sender }); }

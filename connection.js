@@ -5,10 +5,14 @@ const TRANSFER_CHECK = 'parachute:transfer-check:v1';
 const DEPARTURE = 'parachute:leaving:v1';
 const CHECK_INTERVAL_MS = 2000;
 const CHECK_TIMEOUT_MS = 3000;
+const NEARBY_GRACE_MS = 30000;
+const DELIVERY_GRACE_MS = 30000;
 
 class ParachuteConnection {
     constructor() {
         this.devices = new Map();
+        this.signalLost = new Map();
+        this.departed = new Set();
         this.handshakes = new Map();
         this.unsubscribers = [];
         this.active = false;
@@ -66,18 +70,14 @@ class ParachuteConnection {
                 this.startFailure = { stage, error: result?.error || error };
             });
             this.listen('peerAdded', ({ uid }) => {
+                this.clearSignalLoss(uid);
+                this.departed.delete(uid);
                 if (this.active) this.identify(uid);
                 this.render();
             });
             this.listen('peerRemoved', ({ uid }) => {
                 this.stopHandshake(uid);
-                const channel = this.channels.get(uid);
-                if (channel && window.parachuteSharing?.hasActiveTransfer(uid)) {
-                    void this.checkPeer(uid, channel);
-                } else {
-                    this.devices.delete(uid);
-                    this.closePeer(uid);
-                }
+                this.loseSignal(uid);
                 this.render();
             });
             this.listen('peersUpdated', () => this.render());
@@ -216,6 +216,52 @@ class ParachuteConnection {
         this.handshakes.delete(uid);
     }
 
+    clearSignalLoss(uid) {
+        clearTimeout(this.signalLost.get(uid)?.timer);
+        this.signalLost.delete(uid);
+    }
+
+    loseSignal(uid) {
+        if (this.signalLost.has(uid) || this.departed.has(uid)) return;
+        const loss = { until: Date.now() + NEARBY_GRACE_MS };
+        this.signalLost.set(uid, loss);
+        loss.timer = setTimeout(() => {
+            this.signalLost.delete(uid);
+            // Active deliveries outlive the discovery lease.
+            if (!window.parachuteSharing?.hasActiveTransfer(uid)) {
+                this.devices.delete(uid);
+                this.closePeer(uid);
+            }
+            this.render();
+        }, NEARBY_GRACE_MS);
+    }
+
+    nearbyPeers() {
+        if (!this.active) return [];
+        return [...new Set([...this.mesh.peers, ...[...this.signalLost]
+            .filter(([, loss]) => loss.until > Date.now()).map(([uid]) => uid)])]
+            .filter(uid => !this.departed.has(uid));
+    }
+
+    peerActivity(uid) {
+        const channel = this.channels.get(uid);
+        if (!channel) return;
+        channel.lastActivity = Date.now();
+        if (channel.interruptedAt !== undefined) {
+            delete channel.interruptedAt;
+            window.parachuteSharing?.connectionStatus(uid, false);
+        }
+    }
+
+    peerInterrupted(uid, channel, error) {
+        if (this.channels.get(uid) !== channel) return;
+        channel.interruptedAt ??= Date.now();
+        console.warn('Parachute relay interrupted', { peer: uid, reason: error?.message });
+        window.parachuteSharing?.connectionStatus(uid, true);
+        if (Date.now() - channel.interruptedAt >= DELIVERY_GRACE_MS)
+            this.closePeer(uid, 'That device was unreachable for 30 seconds. Its unfinished transfer was removed.');
+    }
+
     sendIdentity(uid, requestIdentity) {
         return this.mesh.relayMessage(uid, {
             type: IDENTITY,
@@ -242,12 +288,15 @@ class ParachuteConnection {
     receiveMessage({ from, msg }) {
         if (!Number.isInteger(from) || !msg) return;
         if (msg.type === DEPARTURE) {
+            this.clearSignalLoss(from);
+            this.departed.add(from);
             this.devices.delete(from);
             this.closePeer(from, 'That device disconnected. Its unfinished transfers were removed.');
             return;
         }
-        if (msg.type === TRANSFER_CHECK) return;
+        if (msg.type === TRANSFER_CHECK) { this.peerActivity(from); return; }
         if (msg.type === IDENTITY) {
+            if (!this.nearbyPeers().includes(from)) return;
             if (typeof msg.name !== 'string' || !msg.name.trim()) return;
             if (!this.devices.has(from) && this.devices.size >= 100) return;
             this.devices.set(from, { name: msg.name.trim().slice(0, 40) });
@@ -259,12 +308,14 @@ class ParachuteConnection {
         }
         if (!this.active || msg.version !== 2) return;
         const sharing = window.parachuteSharing;
-        if (msg.type === 'offer' && !this.mesh.peers.includes(from)) {
+        const existing = sharing?.transports.get(from);
+        const repeatedOffer = existing?.incoming?.id === msg.id;
+        if (msg.type === 'offer' && !repeatedOffer && !this.nearbyPeers().includes(from)) {
             void this.mesh.relayMessage(from, { version: 2, type: 'decline', id: msg.id, reason: 'not-nearby' }).catch(() => {});
             return;
         }
-        const existing = sharing?.transports.get(from);
-        if (!existing && !this.mesh.peers.includes(from)) return;
+        if (!existing && !this.nearbyPeers().includes(from)) return;
+        this.peerActivity(from);
         const transport = existing || sharing?.transportFor(from);
         transport?.receive(msg);
     }
@@ -272,30 +323,30 @@ class ParachuteConnection {
     receiveBinary({ from, payload, meta }) {
         if (!this.active || !this.channels.get(from)?.open
             || meta?.version !== 2 || meta.type !== 'chunk' || !ArrayBuffer.isView(payload)) return;
+        this.peerActivity(from);
         window.parachuteSharing?.transports.get(from)?.receive({ ...meta, bytes: payload });
     }
 
     channelFor(uid) {
         const existing = this.channels.get(uid);
         if (existing?.open) return existing;
-        if (!this.active || !this.mesh.connected || !this.mesh.peers.includes(uid)) return null;
-        // Every recipient has an independent queue and transfer state.
-        const channel = { open: true, peer: uid };
-        let queue = Promise.resolve();
+        if (!this.active || !this.mesh.connected || !this.nearbyPeers().includes(uid)) return null;
+        // Transfer windows bound concurrency; MeshClient handles each relay ID.
+        const channel = { open: true, peer: uid, lastActivity: Date.now() };
         channel.send = packet => {
             if (!channel.open) throw Error('The device disconnected.');
             this.monitorPeer(uid, channel);
-            queue = queue.then(async () => {
+            const delivery = (async () => {
                 if (!channel.open) return;
                 if (packet.type === 'chunk') {
                     const { bytes, ...meta } = packet;
-                    await this.mesh.relay(uid, bytes, { meta });
-                } else await this.mesh.relayMessage(uid, packet);
-            }).catch(error => {
-                if (this.channels.get(uid) === channel)
-                    this.closePeer(uid, `Sharing with that device failed: ${error.message}`);
+                    await this.mesh.relay(uid, bytes, { meta, timeout: CHECK_TIMEOUT_MS });
+                } else await this.mesh.relayMessage(uid, packet, { timeout: CHECK_TIMEOUT_MS });
+                this.peerActivity(uid);
+            })().catch(error => {
+                this.peerInterrupted(uid, channel, error);
             });
-            return queue;
+            return delivery;
         };
         this.channels.set(uid, channel);
         this.monitorPeer(uid, channel);
@@ -314,6 +365,7 @@ class ParachuteConnection {
 
     async checkPeer(uid, channel) {
         if (channel.checking || !channel.open) return;
+        if (channel.interruptedAt === undefined && Date.now() - channel.lastActivity < CHECK_INTERVAL_MS) return;
         channel.checking = true;
         let timer;
         try {
@@ -323,9 +375,11 @@ class ParachuteConnection {
                     timer = setTimeout(() => reject(Error('Device is no longer reachable.')), CHECK_TIMEOUT_MS);
                 })
             ]);
-        } catch {
-            if (this.channels.get(uid) === channel)
-                this.closePeer(uid, 'That device disconnected. Its unfinished transfers were removed.');
+            this.peerActivity(uid);
+        } catch (error) {
+            // A timed-out probe must not override file traffic that just succeeded.
+            if (Date.now() - channel.lastActivity >= CHECK_INTERVAL_MS)
+                this.peerInterrupted(uid, channel, error);
         } finally {
             clearTimeout(timer);
             channel.checking = false;
@@ -351,7 +405,7 @@ class ParachuteConnection {
     }
 
     render(message) {
-        const nearby = this.active ? [...this.mesh.peers] : [];
+        const nearby = this.nearbyPeers();
         const ids = [...nearby];
         for (const uid of this.channels.keys())
             if (!ids.includes(uid) && window.parachuteSharing?.hasActiveTransfer(uid)) ids.push(uid);
@@ -368,7 +422,9 @@ class ParachuteConnection {
         for (const uid of ids) {
             const item = document.createElement('li');
             const label = document.createElement('span');
-            label.textContent = `${this.devices.get(uid)?.name || 'Identifying device…'}${nearby.includes(uid) ? '' : ' · Sharing (room signal changed)'}`;
+            const signalChanged = !this.mesh.peers.includes(uid);
+            label.textContent = `${this.devices.get(uid)?.name || 'Identifying device…'}${signalChanged
+                ? nearby.includes(uid) ? ' · Signal interrupted (30-second grace period)' : ' · Sharing (room signal changed)' : ''}`;
             item.append(label);
             this.list.append(item);
         }
@@ -383,9 +439,10 @@ class ParachuteConnection {
         const mesh = this.mesh;
         // Best effort on a normal exit. Abrupt tab/network loss is covered by
         // bounded reachability checks while any offer or transfer is active.
-        const notices = mesh?.connected && this.active ? [...this.channels.keys()].map(uid =>
+        const notices = mesh?.connected && this.active ? [...new Set([...this.nearbyPeers(), ...this.channels.keys()])].map(uid =>
             mesh.relayMessage(uid, { type: DEPARTURE }, { timeout: 150 }).catch(() => {})
         ) : [];
+        for (const uid of this.signalLost.keys()) this.clearSignalLoss(uid);
         this.generation++;
         this.active = this.ready = false;
         for (const uid of this.handshakes.keys()) this.stopHandshake(uid);

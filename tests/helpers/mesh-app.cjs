@@ -115,7 +115,7 @@ function setup(t) {
             CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
             Date: Clock, ArrayBuffer, Uint8Array, File, Blob, URL, crypto: webcrypto, innerWidth: 1200, innerHeight: 800,
             setTimeout(fn, ms) { const id = ++nextTimer; timers.set(id, { fn, at: now + ms }); return id; },
-            clearTimeout(id) { timers.delete(id); }, console: { error() {} }
+            clearTimeout(id) { timers.delete(id); }, console: { error() {}, warn() {} }
         };
         vm.createContext(context);
         for (const source of sources) vm.runInContext(source, context);
