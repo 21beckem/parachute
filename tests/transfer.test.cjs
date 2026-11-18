@@ -268,3 +268,25 @@ test('remote cancellation during launch sends no data and allows another transfe
     );
     await a.send({ url: 'https://example.com/' });
 });
+
+
+test('optional delivery names validate on incoming manifests and preserve older offers', () => {
+    const base = { sender: 'Sam', kind: 'link', url: 'https://example.com/' };
+    assert.equal(Transfer.validateOffer(base), true);
+    assert.equal(Transfer.validateOffer({ ...base, title: 'Class notes' }), true);
+    for (const title of [42, {}, 'x'.repeat(81), 'bad\nname'])
+        assert.equal(Transfer.validateOffer({ ...base, title }), false);
+});
+
+
+test('parachute colors use a bounded palette while old offers remain valid', () => {
+    const base = { sender: 'Sam', kind: 'link', url: 'https://example.com/' };
+    assert.equal(Transfer.validateOffer(base), true);
+    for (const color of Transfer.COLORS) {
+        assert.equal(Transfer.validateOffer({...base, color}), true);
+        assert.equal(Transfer.offerFor({url: base.url, color}).color, color);
+    }
+    for (const color of ['red', '#ff0000', 42, null, {}])
+        assert.equal(Transfer.validateOffer({...base, color}), false);
+    assert.equal(Transfer.offerFor({url: base.url}).color, 'coral');
+});

@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 // Minimal DOM/clock doubles keep the real controller and physics deterministic.
-function setup() {
+function setup({ smokeGate, random = Math.random } = {}) {
     class Element {
         constructor() {
             this.style = {};
@@ -42,6 +42,7 @@ function setup() {
             for (const fn of this.listeners[event.type] || []) fn(event);
         }
         append(child) {
+            (this.appended ||= []).push(child);
             child.parent = this;
         }
         remove() {
@@ -62,12 +63,16 @@ function setup() {
         focus() {
             document.activeElement = this;
         }
-        animate() {
-            return { finished: Promise.resolve(), cancel() {} };
+        animate(keyframes, options) {
+            const animation = { keyframes, options, finished: this.className === 'launch-cloud' && smokeGate ? smokeGate.promise : Promise.resolve(), cancel() { this.cancelled = true; } };
+            this.lastAnimation = animation;
+            return animation;
         }
     }
     const elements = {};
     const document = {
+        body: new Element(),
+        createElement: () => new Element(),
         querySelector: (name) => (elements[name] ||= new Element()),
         addEventListener() {},
         activeElement: null
@@ -83,6 +88,7 @@ function setup() {
     const context = vm.createContext({
         document,
         window,
+        Math: Object.assign(Object.create(Math), {random}),
         innerWidth: 1200,
         innerHeight: 800,
         AbortController,
@@ -110,7 +116,7 @@ function setup() {
     );
     const manager = window.ParachuteAnimation;
     for (const delivery of [...manager.deliveries]) delivery.cancel();
-    return { api: window.animation, manager, elements, frames, timers };
+    return { api: window.animation, manager, elements, frames, timers, body: document.body };
 }
 
 test('all typed entry points are detached-call safe and run concurrently', () => {
@@ -491,7 +497,7 @@ test('thrown rotated deliveries bounce off both walls without leaving the viewpo
         d.x = side < 0 ? -100 : 1250;
         d.vx = side * 500;
         d.render();
-        assert.equal(d.vx, side * -400);
+        assert.equal(d.vx, side * -54);
         const angle = (d.angle * Math.PI) / 180;
         const w = d.element.offsetWidth,
             h = d.element.offsetHeight;
@@ -511,7 +517,7 @@ test('thrown rotated deliveries bounce off both walls without leaving the viewpo
         d.render();
         assert.equal(
             d.vx,
-            side * -400,
+            side * -54,
             'does not reverse inward motion a second time'
         );
         assert.equal(d.disposed, false);
@@ -560,4 +566,138 @@ test('each payload symbol exists and the template references swappable artwork',
     }
     assert.ok(html.includes('class="delivery-art"'));
     assert.ok(!html.includes('<footer>'));
+});
+
+
+test('launch exhaust outlives the rocket, grows organically, and cleans up after fading', async () => {
+    let fade;
+    const smokeGate = { promise: new Promise(resolve => { fade = resolve; }) };
+    const { api, manager, body } = setup({ smokeGate });
+    let finish;
+    manager.rocket.animate = () => ({ finished: new Promise(resolve => { finish = resolve; }), cancel() {} });
+    const flight = api.launchRocket();
+    const layer = body.appended[0];
+    assert.equal(layer.className, 'launch-exhaust');
+    assert.equal(layer.attributes['aria-hidden'], 'true');
+    assert.equal(layer.style.clipPath, undefined, 'puffs are not cut into a rectangle');
+    assert.equal(layer.appended.length, 14);
+    for (const cloud of layer.appended) {
+        assert.ok(cloud.lastAnimation.options.duration > 3000);
+        assert.equal(cloud.lastAnimation.keyframes.at(-1).opacity, 0);
+    }
+    assert.equal(await api.launchRocket(), false);
+    assert.equal(body.appended.length, 1);
+    finish(); await flight;
+    assert.notEqual(layer.removed, true, 'rocket completion does not cut off the smoke');
+    fade();
+    await new Promise(setImmediate);
+    assert.equal(layer.removed, true);
+    assert.ok(layer.appended.every(cloud => cloud.lastAnimation.cancelled));
+});
+
+test('reduced-motion launch does not create the expanding exhaust overlay', async () => {
+    const { api, manager, body } = setup();
+    manager.reducedMotion.matches = true;
+    await api.launchRocket();
+    assert.equal(body.appended, undefined);
+    assert.equal(manager.rocket.lastAnimation.options.duration, 200);
+});
+
+
+test('new deliveries enter from fully above the screen and settle to the usual fall speed', () => {
+    const {api, frames} = setup();
+    const d = api.dropFile();
+    assert.ok(d.y + d.element.offsetHeight + 80 <= 0, 'canopy, payload and tag start offscreen');
+    const start = d.y;
+    d.paused = true; d.render();
+    assert.equal(d.y, start, 'pausing an entering delivery does not snap it onto the screen');
+    d.paused = false;
+    for (let t = 0; t <= 4000; t += 16) { frames.delete(d.frame); d.tick(t); }
+    assert.ok(d.y > 0, 'the full canopy descends into view');
+    assert.ok(d.vy < 60, 'entry speed settles before the catch area');
+});
+
+test('the tag leads the payload and canopy, with a smooth alternating gust every ten seconds', () => {
+    const {manager} = setup();
+    const first = manager.deliverySway(.1);
+    assert.ok(first.tag < 0);
+    assert.equal(first.payload, 0);
+    assert.equal(first.canopy, 0);
+    const following = manager.deliverySway(.25);
+    assert.ok(following.payload < 0);
+    assert.equal(following.canopy, 0);
+    assert.ok(manager.deliverySway(.5).canopy < 0);
+    assert.ok(manager.deliverySway(.6).tag - Math.sin(.6 * 2.4) * 5 < -8);
+    assert.ok(manager.deliverySway(10.6).tag - Math.sin(10.6 * 2.4) * 5 > 8);
+    assert.ok(Math.abs(manager.deliverySway(2).tag - Math.sin(2 * 2.4) * 5) < .0001);
+    manager.reducedMotion.matches = true;
+    assert.deepEqual(JSON.parse(JSON.stringify(manager.deliverySway(3.6))), {canopy:0,payload:0,tag:0});
+});
+
+test('delayed decorative sway does not change wind travel, throw velocity, or pointer catch results', async () => {
+    const {api,manager} = setup();
+    const a = api.dropLink(), b = api.dropLink();
+    for (const d of [a,b]) Object.assign(d, {x:300,y:100,vx:12,vy:30,time:3.4,last:0,angle:0,angularVelocity:0,enteringViewport:false});
+    a.tick(16);
+    const sway = manager.deliverySway;
+    manager.deliverySway = () => ({canopy:0,payload:0,tag:0});
+    b.tick(16);
+    manager.deliverySway = sway;
+    for (const field of ['x','y','vx','vy','angle']) assert.equal(a[field],b[field],field);
+    assert.notEqual(a.element.querySelector('.delivery-canopy').style.transform,b.element.querySelector('.delivery-canopy').style.transform);
+    for (const d of [a,b]) {
+        d.pointer=1;
+        await d.release({type:'pointerup',pointerId:1,clientX:600,clientY:650});
+        assert.equal(d.disposed,true);
+    }
+});
+
+
+test('gusts carry a parachute steadily for one second, with quiet gaps between pushes', () => {
+    const {api, manager, frames} = setup({random: () => .5});
+    const d = api.dropFile();
+    Object.assign(d, {x:400,y:100,vx:0,vy:0,time:0,last:0,enteringViewport:false});
+    let previous = d.x;
+    for (let t=16;t<=1200;t+=16) {
+        frames.delete(d.frame); d.tick(t);
+        assert.ok(d.x >= previous, 'one gust keeps carrying in the same direction');
+        previous = d.x;
+    }
+    assert.ok(d.x - 400 > 25 && d.x - 400 < 65, 'wind keeps its weight while traveling half as far');
+    assert.equal(manager.windAt(1),0);
+    assert.equal(manager.windAt(2),0);
+    assert.ok(manager.windAt(.5)>.99);
+    assert.equal(manager.windAt(3.5),0);
+    assert.equal(manager.windAt(9.9),0);
+    assert.ok(manager.windAt(10.5)<-.99);
+});
+
+test('soft edge rebounds reverse travel and the active gust instead of pinning a delivery to a wall', () => {
+    for (const side of [-1,1]) {
+        const {api, frames} = setup();
+        const d = api.dropLink();
+        Object.assign(d,{x:side<0?-20:1250,y:100,vx:side*60,time:.7,last:0,enteringViewport:false});
+        d.render();
+        const edge=d.x;
+        assert.equal(Math.sign(d.vx),-side);
+        assert.ok(Math.abs(d.vx)<=54);
+        assert.equal(d.windDirection,-side);
+        for (let t=16;t<=600;t+=16) {frames.delete(d.frame);d.tick(t);}
+        assert.ok((d.x-edge)*-side>5,'moves away from the edge after contact');
+        assert.equal(Math.sign(d.vx),-side);
+    }
+});
+
+test('spawns range across the upper sky while leaving both outer corners clear', () => {
+    const positions=[];
+    for (const value of [0,.2,.5,.8,.999]) {
+        const {api} = setup({random:()=>value});
+        const d=api.dropFile();
+        assert.ok(d.x>=120);
+        assert.ok(d.x+d.element.offsetWidth<=1080);
+        assert.ok(d.y+d.element.offsetHeight<0);
+        positions.push(d.x);
+    }
+    assert.equal(new Set(positions).size,5);
+    assert.ok(positions.at(-1)-positions[0]>700);
 });

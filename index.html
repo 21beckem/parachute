@@ -11,15 +11,15 @@
         <title>Parachute</title>
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="background.css?v=welcome-flight-1" />
-        <link rel="stylesheet" href="style.css?v=smooth-approach-1" />
-        <script src="parachute.js?v=torn-parachute-1" defer></script>
+        <link rel="stylesheet" href="style.css?v=carried-deliveries-2" />
+        <script src="parachute.js?v=carried-deliveries-2" defer></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
-        <script src="transfer.js?v=request-file-1" defer></script>
+        <script src="transfer.js?v=colored-deliveries-1" defer></script>
         <script src="mesh-loader.js?v=request-file-1" defer></script>
         <script src="connection.js?v=welcome-flight-1" defer></script>
         <script src="warmup.js?v=smooth-approach-1" defer></script>
         <script src="welcome.js?v=welcome-flight-1" defer></script>
-        <script src="sharing.js?v=received-box-1" defer></script>
+        <script src="sharing.js?v=carried-deliveries-2" defer></script>
     </head>
     <body>
         <!-- Reusable artwork for the branding and draggable delivery. -->
@@ -42,19 +42,19 @@
                         />
                         <path
                             d="M15 87C15-12 185-12 185 87Q169 70 147 85Q124 69 100 82Q76 69 53 85Q32 71 15 87Z"
-                            fill="#f47869"
-                            stroke="#793e45"
+                            fill="var(--canopy-color, #f47869)"
+                            stroke="var(--canopy-seam, #793e45)"
                         />
                         <path
                             d="M53 85C52 44 69 11 100 7C79 28 76 52 76 76M100 7c33 4 48 39 47 78q-22-16-47-3c0-31 1-51 0-75Z"
                             fill="#fff9ed"
-                            stroke="#793e45"
+                            stroke="var(--canopy-seam, #793e45)"
                         />
                         <path
                             d="M15 87q17 24 38 18q22 18 47 5q27 12 47-5q23 5 38-18q-17-17-38-2q-24-16-47-3Q76 69 53 85Q32 71 15 87Z"
-                            fill="#b95259"
+                            fill="var(--canopy-shade, #b95259)"
                             fill-opacity=".65"
-                            stroke="#793e45"
+                            stroke="var(--canopy-seam, #793e45)"
                         />
                         <path
                             d="m53 85 38 73m56-73-38 73M100 82v76"
@@ -72,198 +72,91 @@
                     </g>
                 </symbol>
                 <symbol id="payload-file" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <rect
-                            x="73"
-                            y="157"
-                            width="54"
-                            height="61"
-                            rx="5"
-                            fill="#fffaf0"
-                        />
-                        <path
-                            d="M85 174h30M85 185h30M85 196h19"
-                            stroke="#5c9fe8"
-                        />
+                    <g stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M80 157 122 154q8-1 9 7v53q0 8-8 9l-43-5Z" fill="#e4caa4" />
+                        <path d="M78 158 119 155q7-1 7 6v54q0 7-7 6l-41-4q-6 0-6-7v-45q0-6 6-7Z" fill="#fffaf0" />
+                        <path d="m85 174 28-1m-28 12h28m-28 11 18 1" fill="none" stroke="#5c9fe8" stroke-width="3.5" />
                     </g>
                 </symbol>
                 <symbol id="payload-folder" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path
-                            d="M61 170v-12q0-5 5-5h23l9 10h35q6 0 6 6v43q0 6-6 6H66q-5 0-5-6Z"
-                            fill="#e8ac50"
-                        />
-                        <path
-                            d="M61 174h78v38q0 6-6 6H66q-5 0-5-6Z"
-                            fill="#ffd779"
-                        />
-                        <path
-                            d="M108 175v22"
-                            stroke="#8a6247"
-                            stroke-dasharray="2 5"
-                        />
-                        <rect
-                            x="103"
-                            y="197"
-                            width="10"
-                            height="12"
-                            rx="3"
-                            fill="#fffaf0"
-                        />
+                    <g transform="translate(50 143) scale(1 .94)" stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M24 7 74 17v47L24 53Z" fill="#fffaf0"/>
+<path d="m35 2 49 11v47l-10 4V17L35 8Z" fill="#e9e1d1"/>
+<path d="M11 24q0-6 6-5l18 4q6 1 9 8l3 5 34 8q7 1 7 8v25q0 7-7 9L16 70q-5-1-5-7Z" fill="#c99740"/>
+<path d="M11 26q0-5 6-4l16 4q6 1 8 8l3 5 32 7v39L16 70q-5-1-5-7Z" fill="#ffd779"/>
+<path d="m76 46 12-5v36q0 6-12 8Z" fill="#d9a343"/>
+<path d="M67 45v31" stroke="#8b7046" stroke-dasharray="2 5" stroke-width="2.5"/>
+<path d="M64 43q0-5 4-4q4 0 4 5l-1 9q0 4-4 3q-4-1-4-5Z" fill="#fffaf0" stroke-width="2.5"/>
+<path d="m20 61 34 8" stroke="#ffe6a6" stroke-width="3"/>
                     </g>
                 </symbol>
                 <symbol id="payload-music" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <rect
-                            x="66"
-                            y="155"
-                            width="68"
-                            height="65"
-                            rx="12"
-                            fill="#bba0e3"
-                        />
-                        <path d="M92 201v-28l27-6v28M92 181l27-6" fill="none" />
-                        <ellipse
-                            cx="85"
-                            cy="203"
-                            rx="8"
-                            ry="6"
-                            fill="#fffaf0"
-                        />
-                        <ellipse
-                            cx="112"
-                            cy="197"
-                            rx="8"
-                            ry="6"
-                            fill="#fffaf0"
-                        />
+                    <g transform="translate(50 143) scale(1 .94)" stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="67" cy="50" r="28" fill="#31495f"/>
+<circle cx="67" cy="50" r="22" fill="none" stroke="#506780" stroke-width="2"/>
+<circle cx="67" cy="50" r="16" fill="none" stroke="#506780" stroke-width="2"/>
+<circle cx="67" cy="50" r="8" fill="#ffd779" stroke-width="2"/>
+<circle cx="67" cy="50" r="2" fill="#293d52" stroke="none"/>
+<path d="m12 17 15-8 47 15-15 8Z" fill="#c9b8e5"/>
+<path d="m59 32 15-8v53l-15 8Z" fill="#8f7aaf"/>
+<path d="m12 17 47 15v53L12 71Z" fill="#fffaf0"/>
+<path d="M12 58q16-4 25 5q11 10 22 4v18L12 71Z" fill="#b6a1d2" stroke="none"/>
+<path d="M12 17 59 32v53L12 71Z" fill="none"/>
+<path d="M32 53V38l15 2v15" fill="none" stroke="#8d79ad" stroke-width="3"/>
+<ellipse cx="27" cy="55" rx="5" ry="3.5" fill="#8d79ad" stroke="none"/>
+<ellipse cx="42" cy="57" rx="5" ry="3.5" fill="#8d79ad" stroke="none"/>
                     </g>
                 </symbol>
                 <symbol id="payload-link" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <rect
-                            x="63"
-                            y="155"
-                            width="74"
-                            height="65"
-                            rx="12"
-                            fill="#85cfd2"
-                        />
-                        <g
-                            transform="rotate(-35 100 187)"
-                            fill="none"
-                            stroke="#fffaf0"
-                            stroke-width="7"
-                        >
-                            <rect
-                                x="73"
-                                y="178"
-                                width="33"
-                                height="19"
-                                rx="9"
-                            />
-                            <rect
-                                x="95"
-                                y="178"
-                                width="33"
-                                height="19"
-                                rx="9"
-                            />
-                            <path d="M93 187h15" />
-                        </g>
+                    <path d="M100 157v10" fill="none" stroke="#293d52" stroke-width="2.5" stroke-linecap="round" />
+                    <g transform="translate(50 143) scale(1 .94)" stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <g transform="rotate(-34 50 46)">
+<path d="M14 36h27a14 14 0 0 1 0 28H21a14 14 0 0 1 0-28Zm2 8a6 6 0 0 0 0 12h23a6 6 0 0 0 0-12Z" fill="#5586ad" fill-rule="evenodd"/>
+<path d="M60 36h24a14 14 0 0 1 0 28H53a14 14 0 0 1 0-28Zm2 8a6 6 0 0 0 0 12h20a6 6 0 0 0 0-12Z" fill="#508f8c" fill-rule="evenodd"/>
+<path d="M14 30h27a14 14 0 0 1 0 28H21a14 14 0 0 1 0-28Zm2 8a6 6 0 0 0 0 12h23a6 6 0 0 0 0-12Z" fill="#97c9e7" fill-rule="evenodd"/>
+<path d="M60 30h24a14 14 0 0 1 0 28H53a14 14 0 0 1 0-28Zm2 8a6 6 0 0 0 0 12h20a6 6 0 0 0 0-12Z" fill="#8fcfc5" fill-rule="evenodd"/>
+<path d="M49 45h7" stroke="#293d52" stroke-width="5"/>
+<path d="M11 35h12m50 0h10" stroke="#e8f5f5" stroke-width="2.5"/>
+</g>
                     </g>
                 </symbol>
                 <symbol id="payload-picture" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <rect
-                            x="61"
-                            y="154"
-                            width="78"
-                            height="66"
-                            rx="5"
-                            fill="#fffaf0"
-                        />
-                        <path d="M68 162h64v43H68Z" fill="#8bcff1" />
-                        <circle
-                            cx="116"
-                            cy="173"
-                            r="6"
-                            fill="#ffd779"
-                            stroke="none"
-                        />
-                        <path
-                            d="m68 205 20-25 15 17 10-12 19 20Z"
-                            fill="#8bb968"
-                        />
-                        <path d="M92 212h16" stroke="#b6c4cb" />
+                    <g transform="translate(50 143) scale(1 .94)" stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <g transform="rotate(12 61 43)">
+<rect x="35" y="6" width="49" height="64" rx="3" fill="#ded8cb"/>
+<rect x="32" y="3" width="49" height="64" rx="3" fill="#fffaf0"/>
+<path d="M38 10h37v40H38Z" fill="#a9d4ed" stroke="none"/>
+</g>
+<g transform="rotate(10 43 48)">
+<rect x="20" y="23" width="51" height="64" rx="3" fill="#d9d3c7"/>
+<rect x="17" y="20" width="51" height="64" rx="3" fill="#fffaf0"/>
+<path d="M23 27h39v40H23Z" fill="#8bcff1" stroke="none"/>
+<circle cx="52" cy="37" r="6" fill="#ffd779" stroke="none"/>
+<path d="M23 58q10-12 22-1l17 10H23Z" fill="#8dad67" stroke="none"/>
+<path d="M23 67q23-18 39-12v12Z" fill="#abc77e" stroke="none"/>
+<path d="M36 75h13" stroke="#b5c3c7" stroke-width="2"/>
+</g>
                     </g>
                 </symbol>
                 <symbol id="payload-video" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <rect
-                            x="61"
-                            y="159"
-                            width="78"
-                            height="59"
-                            rx="7"
-                            fill="#ed8879"
-                        />
-                        <path d="M63 170h74M63 207h74" />
-                        <path
-                            d="M73 162v5m14-5v5m14-5v5m14-5v5m14-5v5M73 211v4m14-4v4m14-4v4m14-4v4m14-4v4"
-                            stroke="#fffaf0"
-                            stroke-width="4"
-                        />
-                        <path d="m94 178 17 11-17 11Z" fill="#fffaf0" />
+                    <g transform="translate(50 143) scale(1 .94)" stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m16 35 9-6 65 4-9 6Z" fill="#acc2d1"/>
+<path d="m81 39 9-6v44l-9 6Z" fill="#506a83"/>
+<path d="M16 35 81 39v44L16 78Z" fill="#7f9db5"/>
+<path d="m16 35-5-13L77 6l5 13Z" fill="#fffaf0"/>
+<path d="m11 22 6-5L82 2l4 13-4 4-5-13Z" fill="#72869a"/>
+<path d="m24 19 12 13 11-3-12-13Zm28-7 12 13 11-3L63 9Z" fill="#425a70" stroke="none"/>
+<path d="m11 22 5 13 66-16-5-13Z" fill="none"/>
+<path d="m43 48 18 13-18 9Z" fill="#ffe3a0" stroke-width="2.5"/>
                     </g>
                 </symbol>
                 <symbol id="payload-other" viewBox="0 0 200 230">
-                    <g
-                        stroke="#293d52"
-                        stroke-width="3.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path
-                            d="m67 171 33-15 33 15v38l-33 13-33-13Z"
-                            fill="#e8ac76"
-                        />
-                        <path d="m67 171 33 14 33-14M100 185v37" fill="none" />
-                        <path
-                            d="m86 163 33 14v14l-11 5v-15l-33-14"
-                            fill="#ffe3a0"
-                        />
-                        <path d="m77 194 12 5" stroke="#fffaf0" />
+                    <g transform="translate(50 143) scale(1 .94)" stroke="#293d52" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 24 50 8 82 24 50 40Z" fill="#efc58f"/>
+<path d="M18 24 50 40v42L18 65Z" fill="#e8b57b"/>
+<path d="M50 40 82 24v41L50 82Z" fill="#cc9664"/>
+<path d="m37 14 32 16v15l-10 5V35L27 19Z" fill="#ffedbb"/>
+<path d="m27 48 11 6" stroke="#fffaf0" stroke-width="4"/>
                     </g>
                 </symbol>
             </defs>
@@ -380,8 +273,8 @@
                     hidden
                 >
                     <svg viewBox="0 0 200 230" aria-hidden="true">
-                        <use href="#parachute" width="200" height="190" />
-                        <use class="delivery-art" href="#payload-file" />
+                        <g class="delivery-canopy"><use href="#parachute" width="200" height="190" /></g>
+                        <g class="delivery-payload"><use class="delivery-art" href="#payload-file" /></g>
                     </svg>
                 </button>
             </section>
@@ -395,81 +288,23 @@
                 <div class="rocket-pad">
                     <div class="rocket">
                         <svg viewBox="0 0 120 360" aria-hidden="true">
-                            <g
-                                stroke="#293d52"
-                                stroke-width="3"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            >
+                            <g stroke="#293d52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                 <g class="rocket-flame">
-                                    <path
-                                        d="M43 310Q32 335 60 357Q88 335 77 310Z"
-                                        fill="#ffb64f"
-                                    />
-                                    <path
-                                        d="M52 313Q47 333 60 343Q73 333 68 313Z"
-                                        fill="#fff1a8"
-                                        stroke="none"
-                                    />
+                                    <path d="M47 307Q40 333 60 353Q80 333 73 307Z" fill="#ffb64f" />
+                                    <path d="M54 309Q49 329 60 339Q71 329 66 309Z" fill="#fff1a8" stroke="none" />
                                 </g>
-                                <!-- Escape tower and tapered command module. -->
-                                <path
-                                    d="M60 5V27M55 28H65L68 45H52Z"
-                                    fill="#fffaf0"
-                                />
-                                <path
-                                    d="M55 29 65 43M65 29 55 43"
-                                    fill="none"
-                                    stroke-width="2"
-                                />
-                                <path d="M52 46H68L74 67H46Z" fill="#fffaf0" />
-                                <path
-                                    d="M46 67H74V112L84 145V294H36V145L46 112Z"
-                                    fill="#fffaf0"
-                                />
-                                <path
-                                    d="M67 69H72V113L81 146V292H71V145L65 112Z"
-                                    fill="#d3dfdf"
-                                    stroke="none"
-                                />
-                                <!-- Saturn V stage bands and alternating black panels. -->
-                                <path
-                                    d="M46 73H74V83H46ZM46 108H74V117H46ZM36 150H84V164H36ZM36 216H84V228H36Z"
-                                    fill="#293d52"
-                                    stroke="none"
-                                />
-                                <path
-                                    d="M37 166H46V191H37ZM56 166H64V191H56ZM74 166H83V191H74ZM37 267H46V294H37ZM56 267H64V294H56ZM74 267H83V294H74Z"
-                                    fill="#293d52"
-                                    stroke="none"
-                                />
-                                <path
-                                    d="M39 201H81M39 207H81M40 237V257M45 237V257M75 237V257M80 237V257"
-                                    fill="none"
-                                    stroke="#b6c4cb"
-                                    stroke-width="1.5"
-                                />
-                                <path
-                                    d="M36 273 20 304H36M84 273 100 304H84"
-                                    fill="#d3dfdf"
-                                />
-                                <path
-                                    d="M36 294H84L79 305H41Z"
-                                    fill="#293d52"
-                                />
-                                <path
-                                    d="M44 305H54L56 315H41ZM66 305H76L79 315H64Z"
-                                    fill="#617184"
-                                />
-                                <path
-                                    d="M58 281H62L65 307H55Z"
-                                    fill="#fffaf0"
-                                />
-                                <path
-                                    d="M53 128H67"
-                                    stroke="#ee7667"
-                                    stroke-width="5"
-                                />
+                                <!-- Rounded Explorer: cream hull, coral swept fins, blue porthole. -->
+                                <path d="M49 290 45 307Q60 314 75 307L71 290Z" fill="#36566c" />
+                                <path d="M35 227Q9 247 5 311Q8 320 13 307Q23 280 42 272Z" fill="#f47869" />
+                                <path d="M85 227Q111 247 115 311Q112 320 107 307Q97 280 78 272Z" fill="#f47869" />
+                                <path d="M60 82C44 93 25 139 25 194C25 235 32 267 43 290Q60 301 77 290C88 267 95 235 95 194C95 139 76 93 60 82Z" fill="#fffaf0" />
+                                <path d="M69 101C85 137 91 167 90 202C90 242 80 278 73 292L64 296C78 264 84 232 83 198C84 159 77 128 69 101Z" fill="#ecdac2" stroke="none" />
+                                <path d="M60 82C50 87 39 107 32 129Q60 137 88 129C81 107 70 87 60 82Z" fill="#f47869" />
+                                <path d="M61 87Q77 105 84 129L76 130Q71 105 61 87Z" fill="#dc685d" stroke="none" />
+                                <circle cx="60" cy="175" r="21" fill="#ffd779" />
+                                <circle cx="60" cy="175" r="17" fill="#8bcff1" />
+                                <path d="M50 172Q52 163 59 163" fill="none" stroke="#d9f2ff" stroke-width="3.5" />
+                                <path d="M60 254C54 266 54 289 57 311Q60 319 63 311C66 289 66 266 60 254Z" fill="#f47869" />
                             </g>
                         </svg>
                     </div>
@@ -525,6 +360,11 @@
         </footer>
         <div class="transfer-tools">
             <p id="transfer-status" role="status" aria-live="polite" hidden></p>
+            <details id="delivery-progress" class="delivery-progress" hidden>
+                <summary>Delivery progress</summary>
+                <strong id="delivery-title"></strong>
+                <div id="delivery-people" aria-label="Delivery progress by person"></div>
+            </details>
             <button id="cancel-transfer" type="button" hidden>Cancel send</button>
         </div>
 
@@ -533,68 +373,98 @@
             class="share-dialog"
             aria-labelledby="share-title"
         >
-            <div class="dialog-heading">
-                <h2 id="share-title">Send a parachute</h2>
-                <button
-                    type="button"
-                    data-close="share-dialog"
-                    aria-label="Close send window"
-                >
-                    Close
-                </button>
+            <div class="dialog-scroll">
+                <div class="dialog-heading">
+                    <h2 id="share-title">Send a parachute</h2>
+                    <button
+                        type="button"
+                        data-close="share-dialog"
+                        aria-label="Close send window"
+                    >
+                        Close
+                    </button>
+                </div>
+                <label for="parachute-title">Parachute name <span class="optional">(optional)</span></label>
+                <input id="parachute-title" maxlength="80" placeholder="Leave blank for an automatic name" />
+                <fieldset class="parachute-colors">
+                    <legend>Parachute color</legend>
+                    <div class="color-options">
+                        <label class="color-option" data-parachute-color="coral">
+                            <input id="color-coral" type="radio" name="parachute-color" value="coral" checked />
+                            <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#parachute" width="200" height="190" /></svg>
+                            <span>Red</span>
+                        </label>
+                        <label class="color-option" data-parachute-color="sky">
+                            <input id="color-sky" type="radio" name="parachute-color" value="sky"  />
+                            <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#parachute" width="200" height="190" /></svg>
+                            <span>Blue</span>
+                        </label>
+                        <label class="color-option" data-parachute-color="sage">
+                            <input id="color-sage" type="radio" name="parachute-color" value="sage"  />
+                            <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#parachute" width="200" height="190" /></svg>
+                            <span>Green</span>
+                        </label>
+                        <label class="color-option" data-parachute-color="gold">
+                            <input id="color-gold" type="radio" name="parachute-color" value="gold"  />
+                            <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#parachute" width="200" height="190" /></svg>
+                            <span>Yellow</span>
+                        </label>
+                        <label class="color-option" data-parachute-color="lavender">
+                            <input id="color-lavender" type="radio" name="parachute-color" value="lavender"  />
+                            <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#parachute" width="200" height="190" /></svg>
+                            <span>Purple</span>
+                        </label>
+                        <label class="color-option" data-parachute-color="rose">
+                            <input id="color-rose" type="radio" name="parachute-color" value="rose"  />
+                            <svg viewBox="0 0 200 120" aria-hidden="true"><use href="#parachute" width="200" height="190" /></svg>
+                            <span>Pink</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <div class="share-tabs" role="tablist" aria-label="What to send">
+                    <button id="files-tab" type="button" role="tab" aria-selected="true" aria-controls="share-files-form">Files</button>
+                    <button id="link-tab" type="button" role="tab" aria-selected="false" aria-controls="share-link-form" tabindex="-1">Link</button>
+                </div>
+                <form id="share-files-form" role="tabpanel" aria-labelledby="files-tab">
+                    <label class="file-drop-zone" id="file-drop-zone" for="share-files">
+                        <span aria-hidden="true">＋</span>
+                        <span>Drop files here or <u>browse</u></span>
+                        <input id="share-files" type="file" multiple aria-describedby="file-help" />
+                    </label>
+                    <div id="selected-files" aria-label="Selected files"></div>
+                    <p id="file-help">Up to 20 files · 100 MB. Zip folders before sending.</p>
+                    <button id="send-files" class="launch-button" type="submit">Launch parachute</button>
+                </form>
+                <form id="share-link-form" role="tabpanel" aria-labelledby="link-tab" hidden>
+                    <label for="share-link">Website link</label>
+                    <input id="share-link" type="url" placeholder="https://example.com" required maxlength="2048" />
+                    <button id="send-link" class="launch-button" type="submit">Launch parachute</button>
+                </form>
+                <p id="share-feedback" role="status" aria-live="polite">Ready when you are.</p>
             </div>
-            <form id="share-files-form">
-                <label for="share-files">Files</label>
-                <input
-                    id="share-files"
-                    type="file"
-                    multiple
-                    aria-describedby="file-help"
-                />
-                <p id="file-help">
-                    Pictures, videos, documents, ZIPs, or any other file. Up to
-                    20 files and 100 MB per transfer. Zip folders before
-                    sending.
-                </p>
-                <button id="send-files" type="submit">Send files</button>
-            </form>
-            <form id="share-link-form">
-                <label for="share-link">Website link</label>
-                <input
-                    id="share-link"
-                    type="url"
-                    placeholder="https://example.com"
-                    required
-                    maxlength="2048"
-                />
-                <button id="send-link" type="submit">Send link</button>
-            </form>
-            <p id="share-feedback" role="status" aria-live="polite">
-                Everyone nearby gets a parachute. Transfers start when they put it in their box.
-            </p>
         </dialog>
 
-        <dialog
-            id="received-dialog"
-            class="share-dialog"
-            aria-labelledby="received-title"
-        >
-            <div class="dialog-heading">
-                <h2 id="received-title">Received</h2>
-                <button
-                    type="button"
-                    data-close="received-dialog"
-                    aria-label="Close received window"
-                >
-                    Close
-                </button>
+        <dialog id="received-dialog" class="share-dialog" aria-labelledby="received-title">
+            <div class="dialog-scroll">
+                <div class="dialog-heading">
+                    <h2 id="received-title">Your deliveries</h2>
+                    <button type="button" data-close="received-dialog" aria-label="Close received window">Close</button>
+                </div>
+                <p id="received-empty">Your next delivery is on its way. Caught parachutes will appear here.</p>
+                <div id="received-items"></div>
+                <p class="dialog-footnote">Save anything you want to keep before refreshing.</p>
             </div>
-            <p>
-                Files and links appear here after their parachute enters your box
-                and the transfer finishes. Items stay until you remove them or refresh.
-            </p>
-            <p id="received-empty">Nothing received yet.</p>
-            <div id="received-items"></div>
+        </dialog>
+        <dialog id="preview-dialog" class="share-dialog" aria-labelledby="preview-title">
+            <div class="dialog-scroll">
+                <div class="dialog-heading">
+                    <h2 id="preview-title">Preview</h2>
+                    <button type="button" data-close="preview-dialog" aria-label="Close preview">Close</button>
+                </div>
+                <p id="preview-sender"></p>
+                <div id="preview-content"></div>
+                <div class="dialog-actions"><a id="preview-download" class="download-action">Download</a></div>
+            </div>
         </dialog>
         <div id="incoming-transfers" aria-label="Incoming transfers"></div>
         <div id="delivery-effects" aria-hidden="true"></div>

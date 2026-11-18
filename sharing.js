@@ -7,26 +7,92 @@ class ParachuteSharing {
         this.receivedNames = new Map();
         this.arrivals = new Set();
         this.busy = false;
+        this.selectedFiles = [];
+        this.selectedURLs = [];
+        this.parachuteColor = 'coral';
         for (const [key, id] of Object.entries({
             shareDialog: 'share-dialog', receivedDialog: 'received-dialog',
             shareFiles: 'share-files', shareLink: 'share-link',
             shareFeedback: 'share-feedback', transferStatus: 'transfer-status',
             sendFiles: 'send-files', sendLink: 'send-link',
             cancelTransfer: 'cancel-transfer', showReceived: 'show-received',
-            receivedItems: 'received-items', receivedEmpty: 'received-empty'
+            receivedItems: 'received-items', receivedEmpty: 'received-empty',
+            parachuteTitle: 'parachute-title', selectedList: 'selected-files',
+            previewDialog: 'preview-dialog', previewContent: 'preview-content',
+            deliveryProgress: 'delivery-progress', deliveryPeople: 'delivery-people'
         })) this[key] = document.getElementById(id);
         document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => {
             document.getElementById(button.dataset.close).close();
         }));
+        for (const dialog of [this.shareDialog, this.receivedDialog, this.previewDialog]) {
+            let startedOutside = false;
+            const outside = event => {
+                if (event.target !== dialog) return false;
+                const rect = dialog.getBoundingClientRect();
+                return event.clientX < rect.left || event.clientX > rect.right
+                    || event.clientY < rect.top || event.clientY > rect.bottom;
+            };
+            dialog.addEventListener('pointerdown', event => {
+                startedOutside = event.button === 0 && outside(event);
+            });
+            dialog.addEventListener('pointercancel', () => { startedOutside = false; });
+            dialog.addEventListener('click', event => {
+                if (startedOutside && outside(event)) dialog.close();
+                startedOutside = false;
+            });
+        }
+        document.addEventListener('click', event => {
+            if (!this.deliveryProgress.contains(event.target)) this.deliveryProgress.open = false;
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') this.deliveryProgress.open = false;
+        });
         document.getElementById('share-files-form').addEventListener('submit', event => {
             event.preventDefault();
-            const files = Array.from(this.shareFiles.files);
+            const files = this.selectedFiles;
             if (!files.length) return this.status('Choose at least one file.');
-            void this.send({ files });
+            void this.send({ files, title: this.parachuteTitle.value.trim(), color: this.parachuteColor });
         });
         document.getElementById('share-link-form').addEventListener('submit', event => {
             event.preventDefault();
-            void this.send({ url: this.shareLink.value.trim() });
+            void this.send({ url: this.shareLink.value.trim(), title: this.parachuteTitle.value.trim(), color: this.parachuteColor });
+        });
+        for (const color of window.ParachuteTransfer.COLORS) {
+            const radio = document.getElementById(`color-${color}`);
+            radio.addEventListener('change', () => {
+                if (radio.checked && !this.busy) this.parachuteColor = color;
+            });
+        }
+        this.shareFiles.addEventListener('change', () => {
+            this.addFiles(Array.from(this.shareFiles.files));
+            this.shareFiles.value = '';
+        });
+        const zone = document.getElementById('file-drop-zone');
+        for (const type of ['dragenter', 'dragover']) zone.addEventListener(type, event => {
+            event.preventDefault();
+            if (!this.busy) zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+        zone.addEventListener('drop', event => {
+            event.preventDefault();
+            zone.classList.remove('drag-over');
+            if (!this.busy) this.addFiles(Array.from(event.dataTransfer.files));
+        });
+        for (const kind of ['files', 'link']) {
+            const tab = document.getElementById(`${kind}-tab`);
+            tab.addEventListener('click', () => this.selectTab(kind));
+            tab.addEventListener('keydown', event => {
+                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                    event.preventDefault();
+                    const next = event.key === 'Home' ? 'files' : event.key === 'End' ? 'link' : kind === 'files' ? 'link' : 'files';
+                    this.selectTab(next);
+                    document.getElementById(`${next}-tab`).focus();
+                }
+            });
+        }
+        this.previewDialog.addEventListener('close', () => this.clearPreview());
+        this.receivedDialog.addEventListener('close', () => {
+            for (const entry of this.entries) entry.badge.hidden = true;
         });
         const box = document.querySelector('.drop-box');
         box.setAttribute('role', 'button');
@@ -44,11 +110,151 @@ class ParachuteSharing {
         });
         this.cancelTransfer.addEventListener('click', () => this.cancel());
         window.addEventListener('pagehide', () => {
+            this.clearSelectedURLs();
+            this.clearPreview();
             this.reset();
             for (const entry of this.entries) this.remove(entry);
         });
         this.sync();
         this.updateCount();
+    }
+
+    selectTab(kind) {
+        for (const value of ['files', 'link']) {
+            const active = value === kind;
+            const tab = document.getElementById(`${value}-tab`);
+            tab.setAttribute('aria-selected', String(active));
+            tab.tabIndex = active ? 0 : -1;
+            document.getElementById(`share-${value === 'files' ? 'files' : 'link'}-form`).hidden = !active;
+        }
+    }
+
+    addFiles(files) {
+        if (this.busy) return;
+        const next = [...this.selectedFiles, ...files];
+        try { window.ParachuteTransfer.offerFor({ files: next }); }
+        catch (error) { this.status(error.message); return; }
+        this.selectedFiles = next;
+        this.renderSelectedFiles();
+        this.shareFeedback.textContent = 'Ready when you are.';
+    }
+
+    clearSelectedURLs() {
+        for (const url of this.selectedURLs) URL.revokeObjectURL(url);
+        this.selectedURLs = [];
+    }
+
+    renderSelectedFiles() {
+        this.clearSelectedURLs();
+        this.selectedList.replaceChildren();
+        this.selectedFiles.forEach((file, index) => {
+            const row = document.createElement('div');
+            row.className = 'selected-file';
+            const kind = window.ParachuteAnimation.typeOf(file);
+            if (/^image\/(png|jpeg|gif|webp|avif|bmp)$/i.test(file.type)) {
+                const image = document.createElement('img');
+                image.alt = '';
+                image.src = URL.createObjectURL(file);
+                this.selectedURLs.push(image.src);
+                row.append(image);
+            } else row.append(this.artwork(kind));
+            const text = document.createElement('span');
+            const name = document.createElement('strong');
+            name.textContent = file.name;
+            const size = document.createElement('small');
+            size.textContent = ParachuteSharing.size(file.size);
+            text.append(name, size);
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', `Remove ${file.name}`);
+            remove.addEventListener('click', () => {
+                if (this.busy) return;
+                this.selectedFiles.splice(index, 1);
+                this.renderSelectedFiles();
+                if (this.selectedFiles.length) this.selectedList.querySelector('button')?.focus();
+                else this.shareFiles.focus();
+            });
+            row.append(text, remove);
+            this.selectedList.append(row);
+        });
+    }
+
+    static deliveryTitle(content) {
+        const title = typeof content.title === 'string' ? content.title.trim() : '';
+        if (title) return title;
+        if (content.kind === 'link' || content.url) return 'Link';
+        const files = content.files || [];
+        if (files.length > 1) return 'Package';
+        const file = files[0] || {};
+        const type = window.ParachuteAnimation.typeOf({name: file.name, type: file.type || file.mime || ''});
+        return {file:'File', folder:'Folder', music:'Music', picture:'Picture', video:'Video', link:'Link', other:'Package'}[type] || 'File';
+    }
+
+    clearPreview() {
+        this.previewToken = null;
+        for (const media of this.previewContent.querySelectorAll?.('video, audio') || []) {
+            media.pause();
+            media.removeAttribute('src');
+            media.load();
+        }
+        this.previewContent.replaceChildren();
+        this.previewEntry = null;
+        const download = document.getElementById('preview-download');
+        download.removeAttribute('href');
+        download.removeAttribute('download');
+    }
+
+    async preview(file, url, entry) {
+        this.clearPreview();
+        const token = this.previewToken = {};
+        this.previewEntry = entry;
+        document.getElementById('preview-title').textContent = file.name;
+        document.getElementById('preview-sender').textContent = `${entry.title} · From ${entry.sender}`;
+        const download = document.getElementById('preview-download');
+        download.href = url;
+        download.download = file.name;
+        this.previewDialog.showModal();
+        const fallback = () => {
+            if (this.previewToken !== token) return;
+            const note = document.createElement('p');
+            note.className = 'preview-unavailable';
+            note.textContent = 'Preview unavailable for this file in your browser. You can still download it.';
+            this.previewContent.replaceChildren(note);
+        };
+        const mime = file.type.toLowerCase();
+        // Only passive image/media formats are embedded. HTML and SVG never run here.
+        let tag;
+        if (/^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(mime)) tag = 'img';
+        else if (mime.startsWith('video/')) tag = 'video';
+        else if (mime.startsWith('audio/')) tag = 'audio';
+        else if (mime === 'application/pdf') tag = 'object';
+        if (tag) {
+            const media = document.createElement(tag);
+            if (tag === 'object') {
+                media.type = 'application/pdf';
+                media.data = url;
+                media.setAttribute('aria-label', `PDF preview: ${file.name}`);
+                const note = document.createElement('p');
+                note.textContent = 'If the PDF does not display here, use Download to open it.';
+                media.append(note);
+            } else {
+                media.src = url;
+                if (tag === 'img') media.alt = file.name;
+                else { media.controls = true; media.preload = 'metadata'; }
+            }
+            media.addEventListener('error', fallback);
+            this.previewContent.append(media);
+        } else if (/^text\/(plain|csv)$/.test(mime) || (!mime && /\.(txt|csv|log|md)$/i.test(file.name))) {
+            if (file.size > 1024 * 1024) { fallback(); return; }
+            try {
+                const text = await file.text();
+                if (this.previewToken !== token) return;
+                const pre = document.createElement('pre');
+                pre.textContent = text;
+                this.previewContent.append(pre);
+            } catch { fallback(); }
+        } else fallback();
     }
 
     static size(bytes) {
@@ -67,13 +273,14 @@ class ParachuteSharing {
         const enabled = nearby > 0 && !this.busy;
         this.connection.send.disabled = !enabled;
         this.sendFiles.disabled = this.sendLink.disabled = !enabled;
-        this.shareFiles.disabled = this.shareLink.disabled = this.busy;
+        this.shareFiles.disabled = this.shareLink.disabled = this.parachuteTitle.disabled = this.busy;
         this.cancelTransfer.hidden = !this.busy;
+        for (const color of window.ParachuteTransfer.COLORS) document.getElementById(`color-${color}`).disabled = this.busy;
     }
 
     open() {
         if (this.busy || !this.connection.active || !this.connection.nearbyPeers().length) return;
-        this.shareFeedback.textContent = 'Everyone currently nearby gets a parachute. Their transfer starts when it enters their box.';
+        this.shareFeedback.textContent = 'Ready when you are.';
         this.shareDialog.showModal();
     }
 
@@ -83,6 +290,13 @@ class ParachuteSharing {
         if (!channel) return null;
         const transport = new window.ParachuteTransfer(channel, {
             onStatus: message => { if (!this.batch) this.status(message); },
+            onSendProgress: progress => {
+                const record = this.batch?.records.get(uid);
+                if (record && ['sending', 'reconnecting'].includes(record.state) && Number.isFinite(progress)) {
+                    record.progress = progress;
+                    this.batchStatus(this.batch);
+                }
+            },
             onConnectionStatus: interrupted => this.connectionStatus(uid, interrupted),
             onOffer: offer => this.offer(uid, offer),
             onReceiveProgress: progress => {
@@ -132,22 +346,33 @@ class ParachuteSharing {
         const item = { uid, offer, bytes, accepted: false, transport };
         this.offers.set(uid, item);
         const preview = offer.kind === 'link' ? [] : offer.files.map(file => ({ name: file.name, type: file.mime }));
-        const type = offer.kind === 'link' ? 'link' : window.ParachuteAnimation.typeOf(preview);
+        const type = offer.kind === 'link' ? 'link' : offer.files.length > 1 ? 'other' : window.ParachuteAnimation.typeOf(preview);
         item.type = type;
-        const title = offer.kind === 'link' ? 'Website link' : offer.files.length === 1
-            ? offer.files[0].name : `${offer.files.length} files`;
+        const title = ParachuteSharing.deliveryTitle(offer);
         item.delivery = window.animation.dropParachute(preview, type, {
             onCatch: () => this.catchOffer(uid, item),
             onExpire: () => this.expireOffer(uid, item)
         });
         const element = item.delivery.element;
+        element.dataset.parachuteColor = window.ParachuteTransfer.COLORS.includes(offer.color) ? offer.color : 'coral';
         element.dataset.offerId = offer.id;
         element.dataset.sender = String(uid);
         element.classList.add('is-offer');
         element.setAttribute('aria-label', `Parachute from ${offer.sender}: ${title}. Put it in the box to receive. Missed offers expire.`);
         const label = document.createElement('span');
         label.className = 'delivery-offer-label';
-        label.textContent = `${offer.sender}: ${title}`;
+        label.title = `${title} · From ${offer.sender}`;
+        const name = document.createElement('strong');
+        name.className = 'delivery-tag-title';
+        name.textContent = title;
+        const sender = document.createElement('span');
+        sender.className = 'delivery-tag-sender';
+        sender.textContent = `From ${offer.sender}`;
+        const detail = document.createElement('span');
+        detail.className = 'delivery-tag-detail';
+        detail.textContent = offer.kind === 'link' ? 'Website link'
+            : `${offer.files.length} file${offer.files.length === 1 ? '' : 's'} · ${ParachuteSharing.size(bytes)}`;
+        label.append(name, sender, detail);
         element.append(label);
         item.timer = setTimeout(() => this.expireOffer(uid, item), window.ParachuteTransfer.OFFER_TIMEOUT_MS);
         if (!this.batch) this.status(`${offer.sender} sent a parachute. Put it in your box to receive it; missed offers expire.`);
@@ -252,9 +477,38 @@ class ParachuteSharing {
     batchStatus(batch) {
         const counts = {};
         for (const record of batch.records.values()) counts[record.state] = (counts[record.state] || 0) + 1;
-        const labels = { waiting: 'waiting for a catch', sending: 'receiving', reconnecting: 'reconnecting (keeping progress)', delivered: 'received', expired: 'expired', failed: 'unavailable', cancelled: 'cancelled' };
+        const labels = { reconnecting: 'reconnecting', delivered: 'delivered', expired: 'expired', failed: 'unavailable', cancelled: 'cancelled' };
         const summary = Object.entries(labels).filter(([state]) => counts[state]).map(([state, label]) => `${counts[state]} ${label}`).join(', ');
-        this.status(`${batch.records.size} nearby device${batch.records.size === 1 ? '' : 's'}: ${summary}.`);
+        this.status(summary ? `Sent · ${summary}` : 'Sent');
+        document.getElementById('delivery-title').textContent = batch.title;
+        this.deliveryPeople.replaceChildren();
+        let visible = 0;
+        for (const record of batch.records.values()) {
+            if (!['sending', 'delivered', 'reconnecting'].includes(record.state) || (record.state === 'reconnecting' && record.previousState === 'waiting')) continue;
+            const row = document.createElement('div');
+            row.className = 'delivery-person';
+            const name = document.createElement('strong');
+            name.textContent = record.name;
+            const state = document.createElement('span');
+            state.textContent = record.state === 'delivered' ? 'Delivered ✓'
+                : record.state === 'reconnecting' ? 'Reconnecting…'
+                : `Receiving · ${Math.round((record.progress || 0) * 100)}%`;
+            row.append(name, state);
+            if (record.state !== 'delivered') {
+                const progress = document.createElement('progress');
+                progress.max = 1;
+                progress.value = record.progress || 0;
+                progress.setAttribute('aria-label', `${record.name}: receiving`);
+                row.append(progress);
+            }
+            this.deliveryPeople.append(row);
+            visible++;
+        }
+        this.deliveryProgress.hidden = visible === 0;
+        if (!batch.revealed && visible) {
+            this.deliveryProgress.open = !window.matchMedia('(max-width: 600px)').matches;
+            batch.revealed = true;
+        }
     }
 
     async send(content) {
@@ -264,7 +518,7 @@ class ParachuteSharing {
         const sender = window.parachuteProfile?.displayName || 'Someone nearby';
         try { window.ParachuteTransfer.offerFor({ ...content, sender }); }
         catch (error) { this.status(error.message); return; }
-        const batch = { records: new Map(targets.map(uid => [uid, { state: 'waiting' }])), cancelled: false };
+        const batch = { title: ParachuteSharing.deliveryTitle(content), records: new Map(targets.map(uid => [uid, { state: 'waiting', name: this.connection.devices?.get(uid)?.name || 'Nearby person', progress: 0 }])), cancelled: false };
         this.batch = batch;
         this.busy = true;
         this.sync();
@@ -293,7 +547,9 @@ class ParachuteSharing {
         this.batchStatus(batch);
         this.batch = null;
         this.busy = false;
-        this.shareFiles.value = this.shareLink.value = '';
+        this.shareFiles.value = this.shareLink.value = this.parachuteTitle.value = '';
+        this.selectedFiles = [];
+        this.renderSelectedFiles();
         this.sync();
     }
 
@@ -310,18 +566,28 @@ class ParachuteSharing {
     }
 
     delivered(result) {
-        const entry = { bytes: result.files.reduce((sum, file) => sum + file.size, 0), urls: [], items: [], node: document.createElement('article') };
+        const entry = { title: ParachuteSharing.deliveryTitle(result), sender: result.sender, bytes: result.files.reduce((sum, file) => sum + file.size, 0), urls: [], items: [], node: document.createElement('article') };
         entry.node.className = 'received-entry';
+        entry.node.dataset.parachuteColor = result.color || 'coral';
         const header = document.createElement('div');
         header.className = 'received-heading';
         const sender = document.createElement('h3');
-        sender.textContent = `From ${result.sender}`;
+        sender.textContent = entry.title;
+        const byline = document.createElement('p');
+        byline.className = 'delivery-byline';
+        byline.textContent = `From ${result.sender}`;
+        const heading = document.createElement('div');
+        heading.append(sender, byline);
+        const badge = document.createElement('span');
+        badge.className = 'new-delivery';
+        badge.textContent = 'New';
+        entry.badge = badge;
         const time = document.createElement('time');
         const now = new Date();
         time.dateTime = now.toISOString();
         time.textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         time.title = now.toLocaleString();
-        header.append(sender, time);
+        header.append(heading, badge, time);
         entry.node.append(header);
         let contents = entry.node;
         if (result.files.length > 1) {
@@ -340,13 +606,15 @@ class ParachuteSharing {
             entry.node.append(packageDetails);
         }
         for (const item of result.kind === 'link' ? [result.url] : result.files) {
+            const row = document.createElement('div');
+            row.className = 'received-item';
             const link = document.createElement('a');
-            link.className = 'received-item';
+            link.className = 'download-action';
             const isLink = typeof item === 'string';
             const name = isLink ? item : item.name;
             const type = isLink ? 'link' : window.ParachuteAnimation.typeOf(item);
             const art = this.artwork(type);
-            link.append(art);
+            row.append(art);
             if (typeof item === 'string') {
                 link.href = window.ParachuteTransfer.website(item);
                 link.target = '_blank';
@@ -364,20 +632,34 @@ class ParachuteSharing {
                     thumbnail.addEventListener('load', () => { art.setAttribute('hidden', ''); });
                     thumbnail.addEventListener('error', () => { thumbnail.hidden = true; art.removeAttribute('hidden'); });
                     thumbnail.src = link.href;
-                    link.append(thumbnail);
+                    row.append(thumbnail);
                 }
             }
             const text = document.createElement('span');
             text.className = 'received-item-text';
             const title = document.createElement('strong');
             const meta = document.createElement('small');
-            meta.textContent = isLink ? `${new URL(item).hostname} · Open link ↗`
-                : `${ParachuteSharing.size(item.size)} · Download ↓`;
+            meta.textContent = isLink ? new URL(item).hostname : ParachuteSharing.size(item.size);
             text.append(title, meta);
-            link.append(text);
+            row.append(text);
+            const actions = document.createElement('div');
+            actions.className = 'file-actions';
+            if (!isLink) {
+                const preview = document.createElement('button');
+                preview.type = 'button';
+                preview.className = 'preview-action';
+                preview.textContent = 'Preview';
+                preview.setAttribute('aria-label', `Preview ${name}`);
+                preview.addEventListener('click', () => { entry.badge.hidden = true; void this.preview(item, link.href, entry); });
+                actions.append(preview);
+            }
+            link.textContent = isLink ? 'Open link ↗' : 'Download';
+            link.addEventListener('click', () => { entry.badge.hidden = true; });
+            actions.append(link);
+            row.append(actions);
             let group = this.receivedNames.get(name);
             if (!group) this.receivedNames.set(name, group = { next: 1, numbered: false, items: new Set() });
-            const record = { name, group, number: group.next++, title, link, sender: result.sender, isLink };
+            const record = { name, group, number: group.next++, title, link, row, sender: result.sender, isLink };
             group.items.add(record);
             if (group.items.size > 1) group.numbered = true;
             for (const other of group.items) {
@@ -386,7 +668,7 @@ class ParachuteSharing {
                 other.link.setAttribute('aria-label', `${other.isLink ? 'Open' : 'Download'} ${label}, from ${other.sender}`);
             }
             entry.items.push(record);
-            contents.append(link);
+            contents.append(row);
         }
         const remove = document.createElement('button');
         remove.type = 'button';
@@ -399,6 +681,7 @@ class ParachuteSharing {
     }
 
     remove(entry) {
+        if (this.previewEntry === entry) { this.previewDialog.close(); this.clearPreview(); }
         for (const url of entry.urls) URL.revokeObjectURL(url);
         for (const item of entry.items) {
             item.group.items.delete(item);

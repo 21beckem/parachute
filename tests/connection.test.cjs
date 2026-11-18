@@ -94,7 +94,7 @@ test('a sustained relay failure closes only that peer after its recovery grace p
     await flight;
     assert.equal(a.c.channels.has(2), false);
     assert.equal(c.sharing.entries.size, 1);
-    assert.match(a.element('transfer-status').textContent, /1 received.*1 unavailable/);
+    assert.match(a.element('transfer-status').textContent, /1 delivered.*1 unavailable/);
 });
 
 test('quiet peers remain eligible for offers for 30 seconds and a renewed match resets the lease', async t => {

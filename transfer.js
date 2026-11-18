@@ -1,6 +1,7 @@
 // File protocol over the selected MeshClient relay adapter.
 // A bounded window keeps the relay busy; acknowledged chunks survive retries.
 class ParachuteTransfer {
+    static COLORS = Object.freeze(['coral', 'sky', 'sage', 'gold', 'lavender', 'rose']);
     static MAX_BYTES = 100 * 1024 * 1024;
     static CHUNK_BYTES = 64 * 1024;
     static MAX_FILES = 20;
@@ -35,6 +36,8 @@ class ParachuteTransfer {
     }
 
     static validateOffer(data) {
+        if (data.color !== undefined && !this.COLORS.includes(data.color)) return false;
+        if (data.title !== undefined && (typeof data.title !== 'string' || data.title.length > 80 || /[\x00-\x1f]/.test(data.title))) return false;
         if (
             typeof data.sender !== 'string' ||
             !data.sender.trim() ||
@@ -74,8 +77,9 @@ class ParachuteTransfer {
         return total <= this.MAX_BYTES;
     }
 
-    static offerFor({ files = [], url, sender = 'Someone nearby' }) {
-        const manifest = { kind: url ? 'link' : 'files', sender: sender.trim().slice(0, 40) || 'Someone nearby' };
+    static offerFor({ files = [], url, title = '', color = 'coral', sender = 'Someone nearby' }) {
+        const manifest = { kind: url ? 'link' : 'files', color, sender: sender.trim().slice(0, 40) || 'Someone nearby' };
+        if (title.trim()) manifest.title = title.trim();
         if (url) manifest.url = this.website(url);
         else manifest.files = files.map(file => ({ name: file.name, size: file.size, mime: file.type || '' }));
         if (!this.validateOffer(manifest)) throw Error('Choose up to 20 files, totaling no more than 100 MB.');
@@ -141,12 +145,12 @@ class ParachuteTransfer {
     }
 
     async send(
-        { files = [], url, sender = 'Your friend' },
+        { files = [], url, title = '', color = 'coral', sender = 'Your friend' },
         launch = async () => true
     ) {
         if (this.outgoing || this.closed || !this.channel.open)
             throw Error('Connect to someone before sending.');
-        const manifest = ParachuteTransfer.offerFor({ files, url, sender });
+        const manifest = ParachuteTransfer.offerFor({ files, url, title, color, sender });
         const state = { id: crypto.randomUUID(), waiters: new Map() };
         this.outgoing = state;
         const current = () =>
@@ -199,6 +203,7 @@ class ParachuteTransfer {
                             sequence
                         ).then(() => {
                             sent += bytes.byteLength;
+                            this.hooks.onSendProgress?.(total ? sent / total : 1);
                             this.hooks.onStatus?.(
                                 `Sending ${Math.round((sent / total) * 100)}%`,
                                 total ? sent / total : 1
@@ -395,6 +400,8 @@ class ParachuteTransfer {
                 return;
             }
             const result = {
+                title: state.title,
+                color: state.color || 'coral',
                 sender: state.sender,
                 kind: state.kind,
                 url: state.url,

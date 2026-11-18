@@ -22,6 +22,7 @@ test('metadata reaches every peer before reads; a caught slow file shows progres
     b.catchOffer(1); await flush();
     const pending = b.sharing.offers.get(1);
     assert.equal(pending.progress.value, .5);
+    assert.equal(a.sharing.deliveryPeople.children[0].children[1].textContent, 'Receiving · 50%');
     assert.match(pending.caption.textContent, /50%/);
     assert.equal(b.sharing.entries.size, 0);
     assert.equal(c.sharing.offers.get(1).accepted, false);
@@ -120,7 +121,7 @@ test('photo previews share the download URL and fall back to artwork when an ima
     app.sharing.delivered({ sender: 'Sam', kind: 'files', files: [new File(['image bytes'], 'photo.heic', { type: 'image/heic' })] });
     const entry = [...app.sharing.entries][0];
     const link = entry.items[0].link;
-    const [art, thumbnail] = link.children;
+    const [art, thumbnail] = entry.items[0].row.children;
     assert.equal(thumbnail.src, link.href);
     assert.equal(link.download, 'photo.heic');
     thumbnail.listeners.load();
@@ -161,7 +162,7 @@ test('one send offers to all current nearby peers; catches and expirations are i
     assert.equal(b.element('received-dialog').open, false, 'completion does not block other falling offers with a modal');
     const href = [...b.sharing.entries][0].items[0].link.href;
     assert.deepEqual(new Uint8Array(await (await fetch(href)).arrayBuffer()), bytes);
-    assert.match(a.element('transfer-status').textContent, /2 nearby devices: 1 received, 1 expired/);
+    assert.match(a.element('transfer-status').textContent, /Sent · 1 delivered, 1 expired/);
     assert.equal(a.mesh.calls.some(call => call.type === 'binary' && call.to === 3), false);
     expiredDelivery.options.onCatch(); await flush();
     assert.equal(c.sharing.entries.size, 0, 'a late catch cannot revive an expired offer');
@@ -239,4 +240,122 @@ test('invalid content does not broadcast or close the send form', async t => {
     assert.equal(a.element('share-dialog').open, true);
     assert.equal(a.sharing.busy, false);
     assert.equal(b.sharing.offers.size, 0);
+});
+
+
+test('custom delivery titles survive the relay without renaming original files', async t => {
+    const { client, start, match } = setup(t);
+    const a = client(1), b = client(2);
+    await start(a, 'Spencer'); await start(b, 'Emma'); match(a, b); await flush();
+    const flight = a.sharing.send({ title: 'Weekend memories', files: [new File(['photo'], 'IMG_1234.jpg')] });
+    await flush();
+    assert.equal(b.sharing.offers.get(1).offer.title, 'Weekend memories');
+    assert.match(b.sharing.offers.get(1).delivery.element.children[0].title, /Weekend memories.*From Spencer/);
+    assert.equal(a.sharing.deliveryPeople.children.length, 0, 'waiting recipients stay out of the progress list');
+    b.catchOffer(1); await flight;
+    const entry = [...b.sharing.entries][0];
+    assert.equal(entry.title, 'Weekend memories');
+    assert.equal(entry.sender, 'Spencer');
+    assert.equal(entry.items[0].link.download, 'IMG_1234.jpg');
+    const row = a.sharing.deliveryPeople.children[0];
+    assert.equal(row.children[0].textContent, 'Emma');
+    assert.equal(row.children[1].textContent, 'Delivered ✓');
+});
+
+test('preview shows text literally, falls back for documents, and clears on removal', async t => {
+    const { client } = setup(t);
+    const app = client(1);
+    const file = new File(['<script>alert(1)</script>'], 'notes.txt', { type: 'text/plain' });
+    app.sharing.delivered({ title: 'Notes', sender: 'Sam', kind: 'files', files: [file] });
+    const entry = [...app.sharing.entries][0];
+    const url = entry.items[0].link.href;
+    await app.sharing.preview(file, url, entry);
+    assert.equal(app.element('preview-content').children[0].textContent, '<script>alert(1)</script>');
+    assert.equal(app.element('preview-download').download, 'notes.txt');
+    const doc = new File(['document'], 'report.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    await app.sharing.preview(doc, url, entry);
+    assert.match(app.element('preview-content').children[0].textContent, /Preview unavailable/);
+    app.sharing.remove(entry);
+    assert.equal(app.element('preview-dialog').open, false);
+    assert.equal(app.element('preview-content').children.length, 0);
+    assert.equal(app.element('preview-download').href, undefined);
+});
+
+test('late text preview cannot replace a newer preview or revive a closed one', async t => {
+    const { client } = setup(t);
+    const app = client(1), read = deferred();
+    const file = { name: 'slow.txt', type: 'text/plain', size: 10, text: () => read.promise };
+    const entry = { title: 'Notes', sender: 'Sam' };
+    const preview = app.sharing.preview(file, 'blob:slow', entry);
+    app.sharing.clearPreview();
+    read.resolve('late text'); await preview;
+    assert.equal(app.element('preview-content').children.length, 0);
+});
+
+test('selection validates the total and removed files are absent from the launch', t => {
+    const { client } = setup(t);
+    const app = client(1);
+    app.sharing.addFiles([new File(['a'], 'a.txt'), new File(['b'], 'b.txt')]);
+    assert.equal(app.sharing.selectedFiles.length, 2);
+    app.sharing.selectedFiles.splice(0, 1);
+    app.sharing.renderSelectedFiles();
+    assert.equal(app.sharing.selectedList.children.length, 1);
+    app.sharing.addFiles([{ name: 'huge.bin', type: '', size: 101 * 1024 * 1024 }]);
+    assert.equal(app.sharing.selectedFiles.length, 1);
+    let sent;
+    app.sharing.send = content => { sent = content; };
+    app.element('parachute-title').value = 'Homework';
+    app.element('share-files-form').listeners.submit({preventDefault() {}});
+    assert.equal(sent.title, 'Homework');
+    assert.equal(sent.files[0].name, 'b.txt');
+});
+
+
+test('selected parachute colors and structured tags reach each recipient', async t => {
+    const {client, start, match} = setup(t);
+    const a = client(1), b = client(2);
+    await start(a, 'Spencer'); await start(b, 'Emma'); match(a,b); await flush();
+    a.element('color-sky').checked = true;
+    a.element('color-sky').listeners.change();
+    a.sharing.addFiles([new File(['notes'], 'notes.txt')]);
+    a.element('parachute-title').value = 'Study notes';
+    let flight;
+    const send = a.sharing.send.bind(a.sharing);
+    a.sharing.send = content => flight = send(content);
+    a.element('share-files-form').listeners.submit({preventDefault() {}});
+    await flush();
+    const pending = b.sharing.offers.get(1);
+    assert.equal(pending.offer.color, 'sky');
+    assert.equal(pending.delivery.element.dataset.parachuteColor, 'sky');
+    const tag = pending.delivery.element.children[0];
+    assert.equal(tag.children[0].textContent, 'Study notes');
+    assert.equal(tag.children[1].textContent, 'From Spencer');
+    assert.equal(tag.children[2].textContent, '1 file · 5 B');
+    b.catchOffer(1); await flight;
+    assert.equal([...b.sharing.entries][0].node.dataset.parachuteColor, 'sky');
+    assert.equal(a.sharing.parachuteColor, 'sky', 'next delivery keeps the last chosen color');
+});
+
+
+test('blank delivery names use the payload style across sender, offer and Received', async t => {
+    const {client,start,match}=setup(t);
+    const a=client(1),b=client(2);
+    await start(a,'Spencer');await start(b,'Emma');match(a,b);await flush();
+    for(const [content,title] of [
+        [{files:[new File(['notes'],'really-long-original-filename.txt')],title:'   '},'File'],
+        [{url:'https://example.com'},'Link'],
+        [{files:[new File(['a'],'a.txt'),new File(['b'],'b.txt')]},'Package']
+    ]) {
+        const flight=a.sharing.send(content);await flush();
+        const offer=b.sharing.offers.get(1);
+        assert.equal(offer.delivery.element.children[0].children[0].textContent,title);
+        assert.equal(a.element('delivery-title').textContent,title);
+        if(title==='Package') assert.equal(offer.type,'other');
+        b.catchOffer(1);await flight;
+        assert.equal([...b.sharing.entries].at(-1).title,title);
+    }
+    const titleOf=a.sharing.constructor.deliveryTitle;
+    a.window.ParachuteAnimation.typeOf=({type})=>type==='image/png'?'picture':'file';
+    assert.equal(titleOf({kind:'files',files:[{name:'any-name.png',mime:'image/png'}]}),'Picture');
+    assert.equal(titleOf({title:'My photos',files:[]}), 'My photos');
 });
