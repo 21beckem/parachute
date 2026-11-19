@@ -147,7 +147,12 @@ class ParachuteSharing {
     renderSelectedFiles() {
         this.clearSelectedURLs();
         this.selectedList.replaceChildren();
+        const pageSize = window.matchMedia('(max-width: 719px)').matches ? 1 : 3;
+        const pages = Math.max(1, Math.ceil(this.selectedFiles.length / pageSize));
+        this.selectionPage = Math.max(0, Math.min(this.selectionPage || 0, pages - 1));
+        const start = this.selectionPage * pageSize;
         this.selectedFiles.forEach((file, index) => {
+            if (index < start || index >= start + pageSize) return;
             const row = document.createElement('div');
             row.className = 'selected-file';
             const kind = window.ParachuteAnimation.typeOf(file);
@@ -178,6 +183,28 @@ class ParachuteSharing {
             row.append(text, remove);
             this.selectedList.append(row);
         });
+        if (pages > 1) {
+            const pager = document.createElement('nav');
+            pager.className = 'selected-file-pages';
+            pager.setAttribute('aria-label', 'Selected file pages');
+            const count = document.createElement('span');
+            count.textContent = `${start + 1}-${Math.min(start + pageSize, this.selectedFiles.length)} of ${this.selectedFiles.length}`;
+            for (const [label, step] of [['Previous', -1], ['Next', 1]]) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = label;
+                button.disabled = this.selectionPage + step < 0 || this.selectionPage + step >= pages;
+                button.addEventListener('click', () => {
+                    if (this.busy) return;
+                    this.selectionPage += step;
+                    this.renderSelectedFiles();
+                    this.selectedList.querySelector('.selected-file-pages button:not(:disabled)')?.focus();
+                });
+                pager.append(button);
+                if (step === -1) pager.append(count);
+            }
+            this.selectedList.append(pager);
+        }
     }
 
     static deliveryTitle(content) {

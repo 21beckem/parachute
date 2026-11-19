@@ -1,0 +1,53 @@
+.control-tower {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    transform-origin: top left;
+}
+.control-tower svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tower-tint { opacity: 0; }
+.crew-headset, .crew-files { opacity: 0; }
+.is-camera-panning .control-tower,
+.has-entered .control-tower {
+    transform: translate(var(--tower-x), var(--tower-y)) scale(var(--tower-scale));
+}
+.is-camera-panning .tower-interior, .has-entered .tower-interior { opacity: 0; transition: opacity .65s; }
+.is-camera-panning .tower-tint, .has-entered .tower-tint { opacity: 1; transition: opacity .65s; }
+.warmup-countdown {
+    position: absolute;
+    left: 8%;
+    top: 38%;
+    z-index: 0;
+    color: #fffaf0;
+    opacity: .13;
+    font-size: clamp(100px, 22vw, 240px);
+    font-weight: bold;
+    line-height: 1;
+    pointer-events: none;
+}
+@media (max-width: 999px) {
+    .warmup-countdown { top: 70%; left: 9%; font-size: 100px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .control-tower, .tower-interior, .tower-tint { transition: none !important; }
+}
+
+/* Keep the welcome form readable without a scrolling panel on small screens. */
+.permission-summary { display: none; }
+@media (max-width: 719px), (max-height: 480px) {
+    .permission-detail { display: none; }
+    .permission-summary { display: block; }
+    .welcome label { font-size: 13px; margin-bottom: 6px; }
+    .welcome input { padding: 10px 12px; font-size: 16px; }
+    .welcome button { padding: 10px 14px; font-size: 14px; }
+    .welcome p, .welcome #name-explanation { font-size: 12px; line-height: 1.4; margin-bottom: 7px; }
+    .welcome #name-explanation { margin-top: 7px; }
+    .permission-explanation { margin-top: 12px; padding-top: 11px; }
+    .welcome-about-link { font-size: 12px; padding: 2px 0; }
+    .welcome #welcome-status:not(:empty) { margin-top: 8px; }
+    .welcome #welcome-reload { padding: 6px 10px; margin-top: 5px; font-size: 12px; }
+}
+@media (max-height: 600px) and (max-width: 719px) {
+    .welcome p, .welcome #name-explanation { font-size: 11px; }
+    .permission-explanation { margin-top: 8px; padding-top: 8px; }
+}

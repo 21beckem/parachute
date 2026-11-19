@@ -11,13 +11,15 @@
         <title>Parachute</title>
         <link rel="icon" href="favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="background.css?v=welcome-flight-1" />
-        <link rel="stylesheet" href="style.css?v=carried-deliveries-2" />
+        <link rel="stylesheet" href="style.css?v=parcel-crew-1" />
         <script src="parachute.js?v=carried-deliveries-2" defer></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
         <script src="transfer.js?v=colored-deliveries-1" defer></script>
         <script src="mesh-loader.js?v=request-file-1" defer></script>
         <script src="connection.js?v=welcome-flight-1" defer></script>
-        <script src="warmup.js?v=smooth-approach-1" defer></script>
+        <link rel="stylesheet" href="tower.css?v=parcel-crew-1" />
+        <script src="tower.js?v=parcel-crew-1" defer></script>
+        <script src="warmup.js?v=parcel-crew-1" defer></script>
         <script src="welcome.js?v=welcome-flight-1" defer></script>
         <script src="sharing.js?v=carried-deliveries-2" defer></script>
     </head>
@@ -203,11 +205,12 @@
                 <button id="welcome-reload" type="button" hidden>Cancel and reload</button>
             </form>
             <div class="permission-explanation">
-                <p>
+                <p class="permission-detail">
                     Connect will ask for your microphone and location. We compare
                     room sound to find nearby devices. Please allow five seconds
                     after both permissions are accepted before sharing nearby.
                 </p>
+                <p class="permission-summary">Connect uses your microphone and location to find nearby devices. Sharing starts after a five-second sound check.</p>
                 <a class="welcome-about-link" href="about.html">About Parachute</a>
             </div>
         </section>

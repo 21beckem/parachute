@@ -359,3 +359,20 @@ test('blank delivery names use the payload style across sender, offer and Receiv
     assert.equal(titleOf({kind:'files',files:[{name:'any-name.png',mime:'image/png'}]}),'Picture');
     assert.equal(titleOf({title:'My photos',files:[]}), 'My photos');
 });
+
+test('selected file pages preserve every file and remove the correct file on later pages', t => {
+    const { client } = setup(t);
+    const app = client(1);
+    app.sharing.addFiles(['a', 'b', 'c', 'd', 'e'].map(name => new File([name], `${name}.txt`)));
+    const list = app.sharing.selectedList;
+    list.querySelector = () => null;
+    assert.equal(list.children.length, 4, 'three files and page controls');
+    list.children.at(-1).children.at(-1).listeners.click();
+    assert.equal(app.sharing.selectionPage, 1);
+    assert.equal(list.children.length, 3, 'two remaining files and page controls');
+    list.children[0].children.at(-1).listeners.click();
+    assert.equal(app.sharing.selectedFiles.map(file => file.name).join(','), 'a.txt,b.txt,c.txt,e.txt');
+    list.children[0].children.at(-1).listeners.click();
+    assert.equal(app.sharing.selectionPage, 0, 'removing the last page returns to the previous page');
+    assert.equal(list.children.length, 3);
+});

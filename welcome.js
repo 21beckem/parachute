@@ -29,7 +29,7 @@
         flight?.ready();
     });
     window.addEventListener('discovery-initialized', () => {
-        if (!starting) status.textContent = 'Scanner ready. Enter your name and click Connect.';
+        if (!starting) status.textContent = innerWidth < 720 ? 'Ready to connect.' : 'Scanner ready. Enter your name and click Connect.';
     });
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -49,7 +49,7 @@
         );
         body.style.setProperty(
             '--welcome-title-y',
-            `${innerHeight * 0.23 - header.offsetTop - wordmark.offsetTop - (wordmark.offsetHeight * scale) / 2}px`
+            `${innerHeight * (innerWidth < 720 || innerHeight < 500 ? .145 : .23) - header.offsetTop - wordmark.offsetTop - (wordmark.offsetHeight * scale) / 2}px`
         );
         body.style.setProperty('--welcome-title-scale', scale);
     }

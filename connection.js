@@ -178,7 +178,6 @@ class ParachuteConnection {
             this.ready = this.active = true;
             window.dispatchEvent(new CustomEvent('discovery-warmup-end'));
             for (const uid of this.mesh.peers) this.identify(uid);
-            this.panel.open = true;
             this.render();
             succeeded = true;
             return true;

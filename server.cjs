@@ -17,6 +17,8 @@ const assets = new Map([
     ['/connection.js', ['connection.js', 'text/javascript']],
     ['/mesh-loader.js', ['mesh-loader.js', 'text/javascript']],
     ['/welcome.js', ['welcome.js', 'text/javascript']],
+    ['/tower.js', ['tower.js', 'text/javascript']],
+    ['/tower.css', ['tower.css', 'text/css']],
     ['/warmup.js', ['warmup.js', 'text/javascript']],
     ['/transfer.js', ['transfer.js', 'text/javascript']],
     ['/sharing.js', ['sharing.js', 'text/javascript']],

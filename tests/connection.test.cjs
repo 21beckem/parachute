@@ -18,6 +18,7 @@ test('both permissions must succeed before the five-second window; each sensor i
     await a.advance(1); assert.equal(await pending, true);
     assert.equal(a.permissionCalls.audio, 1);
     assert.equal(a.permissionCalls.location, 1);
+    assert.notEqual(a.c.panel.open, true, 'connecting leaves the nearby panel closed');
 });
 
 test('a slow analyzer keeps sharing locked beyond five seconds', async t => {
