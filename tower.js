@@ -10,12 +10,25 @@
             <g class="parcel-feet">${path('M-11 18v17m22-17v17', 'none', 'stroke-width="4"')}
                 <ellipse class="foot-left" cx="-13" cy="36" rx="7" ry="3" fill="#435b70"/>
                 <ellipse class="foot-right" cx="13" cy="36" rx="7" ry="3" fill="#435b70"/></g>
-            ${path('M-23-25-15-32H31L23-25Z', '#f6d6a1')}
-            ${path('M23-25 31-32V18L23 25Z', '#c99364')}
-            ${path('M-23-25H23V25H-23Z', ['#e9bc82', '#f0ca91', '#dfae76'][i])}
-            ${path('M-7-32H4L-4-25V-15H-14V-25Z', '#fff0c3', 'stroke="none"')}
-            <g class="parcel-face"><g class="parcel-eyes"><ellipse cx="-10" cy="-3" rx="2" ry="3" fill="#293d52"/><ellipse cx="10" cy="-3" rx="2" ry="3" fill="#293d52"/></g>
-            ${path('M-6 8q6 7 12 0', 'none', 'stroke-width="2"')}</g>
+            ${i === 2 ? `<g class="robot-shell">
+                ${path('M0-27v-7', 'none', 'stroke-width="3"')}<circle cx="0" cy="-37" r="3" fill="#efc979" stroke-width="2"/>
+                ${rect(-30, -13, 8, 17, '#799eb6', 4)}${rect(22, -13, 8, 17, '#799eb6', 4)}
+                ${rect(-9, 13, 18, 10, '#799eb6', 3)}${rect(-20, 20, 40, 13, '#9ec8dc', 5)}
+                ${rect(-25, -28, 50, 46, '#acd4e5', 9)}
+                ${path('M-18-23H15', 'none', 'stroke="#d9eff5" stroke-width="3"')}
+                ${rect(-19, -20, 38, 31, '#31546d', 7)}
+                <circle cx="-17" cy="26" r="2" fill="#f1ce7b" stroke="none"/>
+            </g>` : `
+                ${path('M-23-25-15-32H31L23-25Z', '#f6d6a1')}
+                ${path('M23-25 31-32V18L23 25Z', '#c99364')}
+                ${path('M-23-25H23V25H-23Z', ['#e9bc82', '#f0ca91'][i])}
+                ${path('M-7-32H4L-4-25V-15H-14V-25Z', '#fff0c3', 'stroke="none"')}
+            `}
+            <g class="parcel-face"><g class="parcel-eyes">
+                <ellipse cx="-10" cy="${i === 2 ? -7 : -3}" rx="${i === 2 ? 2.8 : 2}" ry="3" fill="${i === 2 ? '#def5ed' : '#293d52'}" stroke="none"/>
+                <ellipse cx="10" cy="${i === 2 ? -7 : -3}" rx="${i === 2 ? 2.8 : 2}" ry="3" fill="${i === 2 ? '#def5ed' : '#293d52'}" stroke="none"/>
+            </g>
+            ${path(i === 2 ? 'M-6 3q6 6 12 0' : 'M-6 8q6 7 12 0', 'none', `stroke="${i === 2 ? '#def5ed' : '#293d52'}" stroke-width="2"`)}</g>
             ${i === 1 ? `<g class="crew-controller">
                 ${path('M-12 13H12Q18 13 20 19l2 7q-2 5-7 0l-4-4H-11l-4 4q-5 5-7 0l2-7q2-6 8-6Z', '#526a84', 'stroke-width="2"')}
                 ${path('M-11 15v7m-3-3h6', 'none', 'stroke="#fff0c3" stroke-width="2"')}
@@ -24,7 +37,7 @@
                 <circle cx="-19" cy="20" r="3.2" fill="#ffebc4" stroke-width="1.5"/><circle cx="19" cy="20" r="3.2" fill="#ffebc4" stroke-width="1.5"/>
             </g>` : ''}
             <path class="arm-left" fill="none" stroke-width="4"/><path class="arm-right" fill="none" stroke-width="4"/>
-            <circle class="hand-left" r="4.5" fill="#ffebc4"/><circle class="hand-right" r="4.5" fill="#ffebc4"/>
+            <circle class="hand-left" r="4.5" fill="${i === 2 ? '#acd4e5' : '#ffebc4'}"/><circle class="hand-right" r="4.5" fill="${i === 2 ? '#acd4e5' : '#ffebc4'}"/>
             <g class="crew-headset">${path('M-28-4V-13Q-28-43 0-43T28-13V-4', 'none', 'stroke-width="5"')}
                 ${rect(-33, -12, 10, 22, ['#729dbb', '#d98976', '#91ad7d'][i], 4)}${rect(23, -12, 10, 22, ['#729dbb', '#d98976', '#91ad7d'][i], 4)}
                 ${path('M28 7q0 13-17 13', 'none', 'stroke-width="2"')}${rect(5, 17, 10, 5, '#435b70')}
